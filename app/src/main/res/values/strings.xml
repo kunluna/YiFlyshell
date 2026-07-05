@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">逸飞</string>
+    <string name="home_title">连接</string>
+    <string name="terminal_title">终端</string>
+    <string name="add_connection">添加连接</string>
+    <string name="no_connections">暂无连接</string>
+    <string name="connect">连接</string>
+    <string name="disconnect">断开</string>
+    <string name="settings">设置</string>
+</resources>

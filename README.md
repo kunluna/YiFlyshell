@@ -2,6 +2,8 @@
 
 <div align="center">
 
+**[🇺🇸 English](README.md) | [🇨🇳 中文](README_zh.md)**
+
 **A modern Android SSH client built with Jetpack Compose**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)

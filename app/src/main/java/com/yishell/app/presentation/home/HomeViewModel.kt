@@ -78,6 +78,18 @@ class HomeViewModel @Inject constructor(
     init {
         // P1-6：启动时钟，让 connectedSessions 每秒重新 emit 刷新时长。
         startDurationTimer()
+        // 监听数据库变更，编辑连接后同步刷新已连接卡片的 color / customIconUri
+        viewModelScope.launch {
+            connections.collect { list ->
+                val active = sshManager.activeConnections.value
+                for (conn in list) {
+                    val session = active[conn.id] ?: continue
+                    if (session.color != conn.color || session.customIconUri != conn.customIconUri) {
+                        sshManager.refreshConnectionMetadata(conn.id, conn.color, conn.customIconUri)
+                    }
+                }
+            }
+        }
     }
 
     fun disconnect(session: ConnectedSession) {

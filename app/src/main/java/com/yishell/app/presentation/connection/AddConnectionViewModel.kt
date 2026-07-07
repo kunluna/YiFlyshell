@@ -57,8 +57,11 @@ class AddConnectionViewModel @Inject constructor(
     private val _isFavorite = MutableStateFlow(false)
     val isFavorite: StateFlow<Boolean> = _isFavorite.asStateFlow()
 
-    private val _color = MutableStateFlow(com.yishell.app.data.model.ConnectionColor.DEFAULT)
+    private val _color = MutableStateFlow(randomColor())
     val color: StateFlow<com.yishell.app.data.model.ConnectionColor> = _color.asStateFlow()
+
+    private val _customIconUri = MutableStateFlow<String?>(null)
+    val customIconUri: StateFlow<String?> = _customIconUri.asStateFlow()
 
     private val _errors = MutableStateFlow<Map<String, String>>(emptyMap())
     val errors: StateFlow<Map<String, String>> = _errors.asStateFlow()
@@ -97,6 +100,7 @@ class AddConnectionViewModel @Inject constructor(
                     _group.value = config.group
                     _isFavorite.value = config.isFavorite
                     _color.value = config.color
+                    _customIconUri.value = config.customIconUri
                 }
             }
         }
@@ -113,6 +117,7 @@ class AddConnectionViewModel @Inject constructor(
     fun updateGroup(value: String) { _group.value = value }
     fun updateIsFavorite(value: Boolean) { _isFavorite.value = value }
     fun updateColor(value: com.yishell.app.data.model.ConnectionColor) { _color.value = value }
+    fun updateCustomIconUri(value: String?) { _customIconUri.value = value }
 
     fun save() {
         val validationErrors = validate()
@@ -141,6 +146,7 @@ class AddConnectionViewModel @Inject constructor(
             passphrase = encryptedPassphrase,
             group = _group.value.trim(),
             color = _color.value,
+            customIconUri = _customIconUri.value,
             isFavorite = _isFavorite.value
         )
 
@@ -190,7 +196,7 @@ class AddConnectionViewModel @Inject constructor(
         val errors = mutableMapOf<String, String>()
 
         if (_name.value.isBlank()) {
-            errors["name"] = "请输入连接名称"
+            // 连接名称允许为空，连接成功后自动填充设备名
         }
         if (_host.value.isBlank()) {
             errors["host"] = "请输入主机地址"
@@ -213,6 +219,19 @@ class AddConnectionViewModel @Inject constructor(
 
     private fun clearError(field: String) {
         _errors.value = _errors.value - field
+    }
+
+    companion object {
+        private val randomColors = listOf(
+            com.yishell.app.data.model.ConnectionColor.DEFAULT,
+            com.yishell.app.data.model.ConnectionColor.BLUE,
+            com.yishell.app.data.model.ConnectionColor.GREEN,
+            com.yishell.app.data.model.ConnectionColor.YELLOW,
+            com.yishell.app.data.model.ConnectionColor.PURPLE,
+            com.yishell.app.data.model.ConnectionColor.CYAN,
+            com.yishell.app.data.model.ConnectionColor.RED
+        )
+        private fun randomColor() = randomColors.random()
     }
 }
 

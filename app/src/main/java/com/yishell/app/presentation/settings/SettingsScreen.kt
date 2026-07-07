@@ -148,7 +148,11 @@ fun TerminalThemePicker(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         schemes.forEach { scheme ->
-            val theme = TerminalThemes.forScheme(scheme)
+            val isAuto = scheme == TerminalColorScheme.AUTO
+            val theme = if (isAuto) null else TerminalThemes.forScheme(scheme)
+            val schemeName = if (isAuto) "自动 (跟随主题)" else theme!!.name
+            val previewBg = if (isAuto) MaterialTheme.colorScheme.primary else theme!!.background
+            val previewFg = if (isAuto) MaterialTheme.colorScheme.onPrimary else theme!!.foreground
             val isSelected = scheme == selectedScheme
 
             Row(
@@ -171,13 +175,13 @@ fun TerminalThemePicker(
                         .width(120.dp)
                         .height(60.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(theme.background)
+                        .background(previewBg)
                         .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "$",
-                        color = theme.foreground,
+                        color = previewFg,
                         fontSize = 14.sp,
                         fontFamily = FontFamily.Monospace
                     )
@@ -187,7 +191,7 @@ fun TerminalThemePicker(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = theme.name,
+                        text = schemeName,
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }

@@ -94,6 +94,9 @@ dependencies {
     // Tink Android (needed by sshlib for Curve25519/X25519)
     implementation("com.google.crypto.tink:tink-android:1.22.0")
 
+    // Image loading (custom connection icons)
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.test.ext:junit:1.2.1")

@@ -2,6 +2,10 @@ package com.yishell.app.presentation.connection
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -13,16 +17,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.yishell.app.data.model.AuthType
 import com.yishell.app.data.model.ConnectionColor
 import com.yishell.app.presentation.theme.Danger
+import com.yishell.app.presentation.theme.GlassBorder
 import com.yishell.app.presentation.theme.LightBackground
 import com.yishell.app.presentation.theme.PrimaryBlue
 import com.yishell.app.presentation.theme.Success
@@ -48,6 +58,7 @@ fun AddConnectionScreen(
     val group by viewModel.group.collectAsState()
     val isFavorite by viewModel.isFavorite.collectAsState()
     val selectedColor by viewModel.color.collectAsState()
+    val customIconUri by viewModel.customIconUri.collectAsState()
     val errors by viewModel.errors.collectAsState()
     val isEditing by viewModel.isEditing.collectAsState()
     val saveSuccess by viewModel.saveSuccess.collectAsState()
@@ -90,24 +101,6 @@ fun AddConnectionScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { if (it.length <= NAME_MAX_LENGTH) viewModel.updateName(it) },
-                    label = { Text("连接名称") },
-                    leadingIcon = { Icon(Icons.Default.Label, contentDescription = null) },
-                    trailingIcon = {
-                        Text(
-                            text = "${name.length}/$NAME_MAX_LENGTH",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (name.length >= NAME_MAX_LENGTH) Danger else Color.Gray
-                        )
-                    },
-                    isError = errors.containsKey("name"),
-                    supportingText = errors["name"]?.let { { Text(it) } },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
                 OutlinedTextField(
                     value = host,
                     onValueChange = viewModel::updateHost,
@@ -154,15 +147,6 @@ fun AddConnectionScreen(
                     singleLine = true
                 )
 
-                OutlinedTextField(
-                    value = group,
-                    onValueChange = viewModel::updateGroup,
-                    label = { Text("分组") },
-                    leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
                 // 收藏开关
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -184,35 +168,6 @@ fun AddConnectionScreen(
                         checked = isFavorite,
                         onCheckedChange = viewModel::updateIsFavorite
                     )
-                }
-
-                // 颜色选择器
-                Text(
-                    text = "标签颜色",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val colors = listOf(
-                        ConnectionColor.DEFAULT to "默认",
-                        ConnectionColor.BLUE to "蓝",
-                        ConnectionColor.GREEN to "绿",
-                        ConnectionColor.YELLOW to "黄",
-                        ConnectionColor.PURPLE to "紫",
-                        ConnectionColor.CYAN to "青",
-                        ConnectionColor.RED to "红"
-                    )
-                    colors.forEach { (color, label) ->
-                        FilterChip(
-                            selected = selectedColor == color,
-                            onClick = { viewModel.updateColor(color) },
-                            label = { Text(label, fontSize = 12.sp) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
                 }
 
                 Text(
@@ -281,6 +236,202 @@ fun AddConnectionScreen(
                 }
             }
 
+            // 高级设置折叠区
+            var showAdvanced by remember { mutableStateOf(false) }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .whiteGlassCard()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showAdvanced = !showAdvanced },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "高级设置",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = if (showAdvanced) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                AnimatedVisibility(visible = showAdvanced) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { if (it.length <= NAME_MAX_LENGTH) viewModel.updateName(it) },
+                            label = { Text("连接名称") },
+                            leadingIcon = { Icon(Icons.Default.Label, contentDescription = null) },
+                            trailingIcon = {
+                                Text(
+                                    text = "${name.length}/$NAME_MAX_LENGTH",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (name.length >= NAME_MAX_LENGTH) Danger else Color.Gray
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = group,
+                            onValueChange = viewModel::updateGroup,
+                            label = { Text("分组") },
+                            leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        // 预设图标选择器（12张横向滚动）
+                        Text(
+                            text = "图标",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+
+                        // 12张预设图标：6色 × (large + small)
+                        val presetIcons = remember {
+                            listOf(
+                                ConnectionColor.RED to "ic_server_large_red",
+                                ConnectionColor.CYAN to "ic_server_large_cyan",
+                                ConnectionColor.YELLOW to "ic_server_large_yellow",
+                                ConnectionColor.GREEN to "ic_server_large_green",
+                                ConnectionColor.BLUE to "ic_server_large_blue",
+                                ConnectionColor.PURPLE to "ic_server_large_purple",
+                                ConnectionColor.RED to "ic_server_small_red",
+                                ConnectionColor.CYAN to "ic_server_small_cyan",
+                                ConnectionColor.YELLOW to "ic_server_small_yellow",
+                                ConnectionColor.GREEN to "ic_server_small_green",
+                                ConnectionColor.BLUE to "ic_server_small_blue",
+                                ConnectionColor.PURPLE to "ic_server_small_purple"
+                            )
+                        }
+                        val context = LocalContext.current
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            presetIcons.forEach { (color, drawableName) ->
+                                val resId = remember(drawableName) {
+                                    context.resources.getIdentifier(drawableName, "drawable", context.packageName)
+                                }
+                                val isSelected = customIconUri == null && selectedColor == color
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .then(
+                                            if (isSelected) Modifier.border(2.dp, PrimaryBlue, RoundedCornerShape(12.dp))
+                                            else Modifier.border(0.5.dp, GlassBorder, RoundedCornerShape(12.dp))
+                                        )
+                                        .background(Color.White)
+                                        .clickable {
+                                            viewModel.updateColor(color)
+                                            viewModel.updateCustomIconUri(null)
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (resId != 0) {
+                                        androidx.compose.foundation.Image(
+                                            painter = androidx.compose.ui.res.painterResource(resId),
+                                            contentDescription = drawableName,
+                                            contentScale = ContentScale.Fit,
+                                            modifier = Modifier.size(40.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+
+                        // 自定义图片
+                        Text(
+                            text = "自定义图片",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        val pickMediaLauncher = rememberLauncherForActivityResult(
+                            contract = ActivityResultContracts.PickVisualMedia()
+                        ) { uri ->
+                            if (uri != null) {
+                                val flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                context.contentResolver.takePersistableUriPermission(uri, flags)
+                                viewModel.updateCustomIconUri(uri.toString())
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 预览
+                            if (customIconUri != null) {
+                                androidx.compose.foundation.Image(
+                                    painter = coil.compose.rememberAsyncImagePainter(customIconUri),
+                                    contentDescription = "自定义图标",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.AddPhotoAlternate,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    pickMediaLauncher.launch(
+                                        androidx.activity.result.PickVisualMediaRequest(
+                                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
+                                    )
+                                },
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("选择图片", fontSize = 12.sp)
+                            }
+                            if (customIconUri != null) {
+                                TextButton(
+                                    onClick = { viewModel.updateCustomIconUri(null) },
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Text("清除", fontSize = 12.sp, color = Danger)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             AnimatedVisibility(visible = testResult != null) {
                 testResult?.let { result ->
                     val isSuccess = result is TestConnectionResult.PortReachable
@@ -335,7 +486,7 @@ fun AddConnectionScreen(
 
             val portValid = portInt?.let { it in 1..65535 } ?: false
             val privateKeyValid = authType == AuthType.PASSWORD || privateKeyPath.isNotBlank()
-            val formValid = name.isNotBlank() && host.isNotBlank() && username.isNotBlank() && portValid && privateKeyValid
+            val formValid = host.isNotBlank() && username.isNotBlank() && portValid && privateKeyValid
 
             OutlinedButton(
                 onClick = { viewModel.testConnection() },

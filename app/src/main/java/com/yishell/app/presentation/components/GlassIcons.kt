@@ -52,10 +52,30 @@ fun GlassServerIcon(
     color: ConnectionColor = ConnectionColor.DEFAULT,
     showStar: Boolean = false,
     showPlus: Boolean = false,
+    useTerminal: Boolean = false,
+    customIconUri: String? = null,
     size: Int = 80
 ) {
+    // 自定义图标优先
+    if (customIconUri != null) {
+        androidx.compose.foundation.Image(
+            painter = coil.compose.rememberAsyncImagePainter(customIconUri),
+            contentDescription = contentDescription,
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            modifier = modifier.size(size.dp)
+        )
+        return
+    }
     val resId = when {
         showPlus -> R.drawable.ic_server_action
+        useTerminal -> when (color) {
+            ConnectionColor.DEFAULT, ConnectionColor.BLUE -> R.drawable.ic_server_term_blue
+            ConnectionColor.GREEN -> R.drawable.ic_server_term_green
+            ConnectionColor.YELLOW -> R.drawable.ic_server_term_yellow
+            ConnectionColor.PURPLE -> R.drawable.ic_server_term_purple
+            ConnectionColor.CYAN -> R.drawable.ic_server_term_orange
+            ConnectionColor.RED -> R.drawable.ic_server_term_red
+        }
         showStar -> when (color) {
             ConnectionColor.DEFAULT, ConnectionColor.BLUE -> R.drawable.ic_server_fav_blue
             ConnectionColor.GREEN -> R.drawable.ic_server_fav_green
@@ -67,7 +87,7 @@ fun GlassServerIcon(
         else -> when (color) {
             ConnectionColor.DEFAULT, ConnectionColor.BLUE -> R.drawable.ic_server_large_blue
             ConnectionColor.GREEN -> R.drawable.ic_server_large_green
-            ConnectionColor.YELLOW -> R.drawable.ic_server_small_yellow
+            ConnectionColor.YELLOW -> R.drawable.ic_server_large_yellow
             ConnectionColor.PURPLE -> R.drawable.ic_server_large_purple
             ConnectionColor.CYAN -> R.drawable.ic_server_large_cyan
             ConnectionColor.RED -> R.drawable.ic_server_large_red

@@ -17,6 +17,7 @@ data class ConnectionConfig(
     val privateKeyPath: String? = null,
     val passphrase: String? = null,
     val color: ConnectionColor = ConnectionColor.DEFAULT,
+    val customIconUri: String? = null,
     val group: String = "Default",
     val lastConnected: Long? = null,
     val isConnected: Boolean = false,

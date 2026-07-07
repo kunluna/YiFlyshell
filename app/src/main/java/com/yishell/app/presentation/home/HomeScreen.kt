@@ -61,10 +61,8 @@ fun HomeScreen(
                 .padding(paddingValues)
                 .background(AppBackground),
             contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp) // 规范 5.3 Section 间距 24dp
+            verticalArrangement = Arrangement.spacedBy(16.dp) // Section 间距缩紧
         ) {
-            item { Spacer(modifier = Modifier.statusBarsPadding()) }
-
             item {
                 TopNavBar(
                     onSearch = onSearch,
@@ -135,7 +133,7 @@ private fun TopNavBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 12.dp), // 规范 5.2 页面左右 24dp
+            .padding(horizontal = 24.dp, vertical = 2.dp), // 规范 5.2 页面左右 24dp
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
@@ -253,7 +251,11 @@ private fun ConnectedSection(
             if (sessions.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 sessions.forEachIndexed { index, session ->
-                    if (index > 0) Spacer(modifier = Modifier.height(10.dp))
+                    if (index > 0) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        DashedDivider()
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
                     ConnectedCard(
                         session = session,
                         onDisconnect = { onDisconnect(session) },
@@ -290,15 +292,16 @@ private fun ConnectedCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(LightSurface, RoundedCornerShape(18.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .clip(RoundedCornerShape(14.dp))
+            .background(LightSurface, RoundedCornerShape(14.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         GlassServerIcon(
-            modifier = Modifier.size(64.dp), // 规范 7.7 大图标 64dp
+            modifier = Modifier.size(48.dp),
             color = session.info.color,
-            size = 64
+            customIconUri = session.info.customIconUri,
+            size = 48
         )
         Spacer(modifier = Modifier.width(12.dp)) // 规范 5.6 图标与文字 12dp
         Column(modifier = Modifier.weight(1f)) {
@@ -456,7 +459,11 @@ private fun RecentSection(
             if (recentList.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 recentList.forEachIndexed { index, config ->
-                    if (index > 0) Spacer(modifier = Modifier.height(8.dp))
+                    if (index > 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        DashedDivider()
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                     RecentItem(
                         config = config,
                         onClick = { onConnect(config.id) }
@@ -493,9 +500,10 @@ private fun RecentItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         GlassServerIcon(
-            modifier = Modifier.size(44.dp),
+            modifier = Modifier.size(48.dp),
             color = config.color,
-            size = 44
+            useTerminal = true,
+            size = 48
         )
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -583,7 +591,11 @@ private fun FavoriteSection(
             if (favoriteList.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 favoriteList.forEachIndexed { index, config ->
-                    if (index > 0) Spacer(modifier = Modifier.height(8.dp))
+                    if (index > 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        DashedDivider()
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                     FavoriteItem(
                         config = config,
                         onConnect = { onConnect(config.id) },
@@ -628,10 +640,10 @@ private fun FavoriteItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         GlassServerIcon(
-            modifier = Modifier.size(44.dp),
+            modifier = Modifier.size(48.dp),
             color = config.color,
-            showStar = true,
-            size = 44
+            useTerminal = true,
+            size = 48
         )
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -729,7 +741,7 @@ private fun NewConnectionCard(onClick: () -> Unit) {
         ) {
             GlassServerIcon(
                 modifier = Modifier.size(72.dp),
-                showPlus = true,
+                useTerminal = true,
                 size = 72
             )
             Spacer(modifier = Modifier.width(14.dp))
@@ -856,4 +868,29 @@ private fun getDurationString(connectedAt: Long): String {
     val minutes = (elapsed % 3600000) / 60000
     val seconds = (elapsed % 60000) / 1000
     return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+}
+
+@Composable
+private fun DashedDivider(
+    color: Color = Color(0xFFE5E5EA).copy(alpha = 0.6f),
+    thickness: Float = 1f
+) {
+    androidx.compose.foundation.Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(thickness.dp)
+    ) {
+        val dashWidth = 6.dp.toPx()
+        val dashGap = 4.dp.toPx()
+        var x = 0f
+        while (x < size.width) {
+            drawLine(
+                color = color,
+                start = androidx.compose.ui.geometry.Offset(x, 0f),
+                end = androidx.compose.ui.geometry.Offset(minOf(x + dashWidth, size.width), 0f),
+                strokeWidth = thickness
+            )
+            x += dashWidth + dashGap
+        }
+    }
 }

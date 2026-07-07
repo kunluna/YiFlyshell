@@ -94,8 +94,14 @@ class TerminalViewModel @Inject constructor(
     private val _keyboardLayout = MutableStateFlow("")
     val keyboardLayout: StateFlow<String> = _keyboardLayout.asStateFlow()
 
-    private val _terminalColorScheme = MutableStateFlow(TerminalColorScheme.DEFAULT)
+    private val _terminalColorScheme = MutableStateFlow(TerminalColorScheme.AUTO)
     val terminalColorScheme: StateFlow<TerminalColorScheme> = _terminalColorScheme.asStateFlow()
+
+    private val _isDarkTheme = MutableStateFlow(false)
+    val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
+
+    private val _fontSize = MutableStateFlow(14)
+    val fontSize: StateFlow<Int> = _fontSize.asStateFlow()
 
     private val _connectionDuration = MutableStateFlow(0L)
     val connectionDuration: StateFlow<Long> = _connectionDuration.asStateFlow()
@@ -144,6 +150,8 @@ class TerminalViewModel @Inject constructor(
             val settings = settingsDataStore.settings.first()
             _keyboardLayout.value = settings.keyboardLayout
             _terminalColorScheme.value = settings.terminalColorScheme
+            _isDarkTheme.value = settings.isDarkTheme
+            _fontSize.value = settings.fontSize
         }
         // 加载快捷命令：先 seed 默认值，再收集 Flow
         if (connectionId.isNotEmpty()) {
@@ -226,7 +234,7 @@ class TerminalViewModel @Inject constructor(
                 _connectionState.value = ConnectionState.Connected
                 connectionStartTime = System.currentTimeMillis()
                 startStatsTimer()
-                appendOutput("已连接到 ${config.name}\n\n")
+                appendOutput("已连接到 ${config.host}\n\n")
                 currentSessionId = try {
                     connectionRepository.startSession(connectionId)
                 } catch (e: Exception) {
@@ -234,6 +242,21 @@ class TerminalViewModel @Inject constructor(
                     null
                 }
                 startOutputReader()
+
+                // 连接名称为空时，自动获取设备名回填
+                if (config.name.isBlank()) {
+                    viewModelScope.launch {
+                        val hostname = sshManager.executeSingleCommand(connectionId, "hostname")
+                        if (!hostname.isNullOrBlank()) {
+                            val updated = config.copy(name = hostname)
+                            connectionRepository.updateConnection(updated)
+                            sshManager.updateConnectionName(connectionId, hostname)
+                            _connectionName.value = hostname
+                            appendOutput("设备名: $hostname\n\n")
+                            Log.d(TAG, "Auto-filled connection name: $hostname")
+                        }
+                    }
+                }
             } else {
                 // 安全修复（P0-1）：如果已进入 HostKeyPending 状态（等待用户确认指纹），
                 // 不要覆盖成 Error —— 用户还没做决定，不是"连接失败"。
@@ -299,7 +322,7 @@ class TerminalViewModel @Inject constructor(
                 _connectionState.value = ConnectionState.Connected
                 connectionStartTime = System.currentTimeMillis()
                 startStatsTimer()
-                appendOutput("已连接到 ${config.name}\n\n")
+                appendOutput("已连接到 ${config.host}\n\n")
                 currentSessionId = try {
                     connectionRepository.startSession(connectionId)
                 } catch (e: Exception) {
@@ -307,6 +330,21 @@ class TerminalViewModel @Inject constructor(
                     null
                 }
                 startOutputReader()
+
+                // 连接名称为空时，自动获取设备名回填
+                if (config.name.isBlank()) {
+                    viewModelScope.launch {
+                        val hostname = sshManager.executeSingleCommand(connectionId, "hostname")
+                        if (!hostname.isNullOrBlank()) {
+                            val updated = config.copy(name = hostname)
+                            connectionRepository.updateConnection(updated)
+                            sshManager.updateConnectionName(connectionId, hostname)
+                            _connectionName.value = hostname
+                            appendOutput("设备名: $hostname\n\n")
+                            Log.d(TAG, "Auto-filled connection name: $hostname")
+                        }
+                    }
+                }
             } else {
                 if (_connectionState.value !is ConnectionState.HostKeyPending) {
                     _connectionState.value = ConnectionState.Error("连接失败")

@@ -18,6 +18,7 @@ import javax.inject.Singleton
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 enum class TerminalColorScheme {
+    AUTO,
     DEFAULT,
     SOLARIZED_DARK,
     SOLARIZED_LIGHT,
@@ -26,10 +27,10 @@ enum class TerminalColorScheme {
 }
 
 data class AppSettings(
-    val isDarkTheme: Boolean = true,
+    val isDarkTheme: Boolean = false,
     val defaultPort: Int = 22,
     val fontSize: Int = 14,
-    val terminalColorScheme: TerminalColorScheme = TerminalColorScheme.DEFAULT,
+    val terminalColorScheme: TerminalColorScheme = TerminalColorScheme.AUTO,
     val keyboardLayout: String = "[\"⏎ Enter\",\"␣ Space\",\"←\",\"↑\",\"→\",\"↓\",\"Esc\",\"Tab\",\"Ctrl\",\"Alt\",\";\",\"/\",\"|\",\"-\",\"_\",\"~\",\".\",\"历史↑\",\"历史↓\",\"PgUp\",\"PgDn\"]",
     val glassEffect: Boolean = true,
     val sshTimeout: Int = 30,
@@ -57,14 +58,14 @@ class SettingsDataStore @Inject constructor(
 
     val settings: Flow<AppSettings> = dataStore.data.map { prefs ->
         AppSettings(
-            isDarkTheme = prefs[Keys.IS_DARK_THEME] ?: true,
+            isDarkTheme = prefs[Keys.IS_DARK_THEME] ?: false,
             defaultPort = prefs[Keys.DEFAULT_PORT] ?: 22,
             fontSize = prefs[Keys.FONT_SIZE] ?: 14,
             terminalColorScheme = try {
-                TerminalColorScheme.valueOf(prefs[Keys.TERMINAL_COLOR_SCHEME] ?: "DEFAULT")
+                TerminalColorScheme.valueOf(prefs[Keys.TERMINAL_COLOR_SCHEME] ?: "AUTO")
             } catch (e: Exception) {
                 Log.w("SettingsDataStore", "Invalid terminal color scheme: ${prefs[Keys.TERMINAL_COLOR_SCHEME]}", e)
-                TerminalColorScheme.DEFAULT
+                TerminalColorScheme.AUTO
             },
             keyboardLayout = prefs[Keys.KEYBOARD_LAYOUT] ?: "[\"⏎ Enter\",\"␣ Space\",\"←\",\"↑\",\"→\",\"↓\",\"Esc\",\"Tab\",\"Ctrl\",\"Alt\",\";\",\"/\",\"|\",\"-\",\"_\",\"~\",\".\",\"历史↑\",\"历史↓\",\"PgUp\",\"PgDn\"]",
             glassEffect = prefs[Keys.GLASS_EFFECT] ?: true,

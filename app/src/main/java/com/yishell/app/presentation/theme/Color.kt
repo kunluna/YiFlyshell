@@ -64,12 +64,31 @@ object TerminalThemes {
         name = "Dracula"
     )
 
+    // 亮色终端配色（跟随 App 亮色主题时使用）
+    val LIGHT = Scheme(
+        background = Color(0xFFF7F9FC),
+        foreground = Color(0xFF1F2937),
+        cursor = Color(0xFF4D8DFF),
+        selection = Color(0x804D8DFF),
+        name = "亮色"
+    )
+
     fun forScheme(scheme: TerminalColorScheme): Scheme = when (scheme) {
+        TerminalColorScheme.AUTO -> DEFAULT
         TerminalColorScheme.DEFAULT -> DEFAULT
         TerminalColorScheme.SOLARIZED_DARK -> SOLARIZED_DARK
         TerminalColorScheme.SOLARIZED_LIGHT -> SOLARIZED_LIGHT
         TerminalColorScheme.MONOKAI -> MONOKAI
         TerminalColorScheme.DRACULA -> DRACULA
+    }
+
+    /**
+     * 解析最终使用的配色：AUTO 时根据 App 主题明暗自动选择亮/暗终端配色；
+     * 其余具体方案直接返回，作为手动覆盖。
+     */
+    fun resolve(scheme: TerminalColorScheme, isDark: Boolean): Scheme = when (scheme) {
+        TerminalColorScheme.AUTO -> if (isDark) DEFAULT else LIGHT
+        else -> forScheme(scheme)
     }
 }
 

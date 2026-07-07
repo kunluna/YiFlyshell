@@ -67,11 +67,11 @@ fun MonitorScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = TerminalBackground
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
-        containerColor = DarkBackground
+        containerColor = MaterialTheme.colorScheme.surface
     ) { paddingValues ->
         when {
             error != null -> {
@@ -117,7 +117,7 @@ fun MonitorScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "暂无监控数据",
-                                color = TerminalForeground.copy(alpha = 0.5f),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                                 fontSize = 14.sp
                             )
                             Spacer(modifier = Modifier.height(8.dp))
@@ -148,7 +148,7 @@ fun MonitorScreen(
                                 fontFamily = FontFamily.Monospace,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(DarkSurface, RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
                                     .padding(12.dp)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
@@ -186,7 +186,7 @@ fun MonitorScreen(
                         val diskColor = when {
                             monitorData.diskUsage > 80 -> AnsiRed
                             monitorData.diskUsage > 50 -> AnsiYellow
-                            else -> TerminalForeground
+                            else -> MaterialTheme.colorScheme.onSurface
                         }
                         InfoCard(
                             title = "磁盘",
@@ -222,7 +222,7 @@ fun MonitorScreen(
                         if (lastUpdated.isNotEmpty()) {
                             Text(
                                 text = lastUpdated,
-                                color = TerminalForeground.copy(alpha = 0.5f),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                                 fontSize = 12.sp,
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -256,8 +256,8 @@ fun MonitorCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .background(DarkSurface, RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(
@@ -272,12 +272,12 @@ fun MonitorCard(
             ) {
                 Text(
                     text = title,
-                    color = TerminalForeground.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     fontSize = 13.sp
                 )
                 Text(
                     text = value,
-                    color = TerminalForeground,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -299,7 +299,7 @@ fun MonitorCard(
                     .fillMaxWidth()
                     .height(6.dp)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(DarkSurfaceVariant)
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
             ) {
                 Box(
                     modifier = Modifier
@@ -317,13 +317,13 @@ fun MonitorCard(
 fun InfoCard(
     title: String,
     value: String,
-    valueColor: Color = TerminalForeground
+    valueColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .background(DarkSurface, RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(
@@ -333,7 +333,7 @@ fun InfoCard(
         ) {
             Text(
                 text = title,
-                color = TerminalForeground.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 fontSize = 13.sp
             )
             Spacer(modifier = Modifier.height(4.dp))
@@ -358,8 +358,8 @@ fun NetSpeedCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .background(DarkSurface, RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(
@@ -369,7 +369,7 @@ fun NetSpeedCard(
         ) {
             Text(
                 text = "网络",
-                color = TerminalForeground.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 fontSize = 13.sp
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -388,7 +388,7 @@ fun NetSpeedCard(
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         )
-                        Text("下载", color = TerminalForeground.copy(alpha = 0.5f), fontSize = 11.sp)
+                        Text("下载", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), fontSize = 11.sp)
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -402,7 +402,7 @@ fun NetSpeedCard(
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         )
-                        Text("上传", color = TerminalForeground.copy(alpha = 0.5f), fontSize = 11.sp)
+                        Text("上传", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), fontSize = 11.sp)
                     }
                 }
             }
@@ -419,8 +419,8 @@ fun LoadAverageCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .background(DarkSurface, RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(
@@ -430,7 +430,7 @@ fun LoadAverageCard(
         ) {
             Text(
                 text = "负载均值",
-                color = TerminalForeground.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 fontSize = 13.sp
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -451,13 +451,13 @@ fun LoadItem(label: String, value: Float) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = String.format("%.2f", value),
-            color = TerminalForeground,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold
         )
         Text(
             text = label,
-            color = TerminalForeground.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
             fontSize = 11.sp
         )
     }
@@ -475,8 +475,8 @@ fun ProcessListCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .background(DarkSurface, RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -495,7 +495,7 @@ fun ProcessListCard(
             ) {
                 Text(
                     text = "进程 (${processes.size})",
-                    color = TerminalForeground,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -507,21 +507,21 @@ fun ProcessListCard(
             }
 
             if (expanded && processes.isNotEmpty()) {
-                HorizontalDivider(color = DarkSurfaceVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                 
                 // Header
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(DarkSurfaceVariant.copy(alpha = 0.3f))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f).copy(alpha = 0.3f))
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("PID", color = TerminalForeground.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.width(50.dp))
-                    Text("用户", color = TerminalForeground.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.width(60.dp))
-                    Text("CPU%", color = TerminalForeground.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.width(45.dp))
-                    Text("内存%", color = TerminalForeground.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.width(45.dp))
-                    Text("命令", color = TerminalForeground.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.weight(1f))
+                    Text("PID", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.width(50.dp))
+                    Text("用户", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.width(60.dp))
+                    Text("CPU%", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.width(45.dp))
+                    Text("内存%", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.width(45.dp))
+                    Text("命令", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), fontSize = 11.sp, modifier = Modifier.weight(1f))
                 }
 
                 processes.forEach { proc ->
@@ -532,7 +532,7 @@ fun ProcessListCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(proc.pid, color = Cyan500, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.width(50.dp))
-                        Text(proc.user, color = TerminalForeground.copy(alpha = 0.7f), fontSize = 11.sp, modifier = Modifier.width(60.dp), maxLines = 1)
+                        Text(proc.user, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontSize = 11.sp, modifier = Modifier.width(60.dp), maxLines = 1)
                         Text(
                             String.format("%.1f", proc.cpuPercent),
                             color = when { proc.cpuPercent > 50 -> AnsiRed; proc.cpuPercent > 20 -> AnsiYellow; else -> Green500 },
@@ -549,7 +549,7 @@ fun ProcessListCard(
                         )
                         Text(
                             proc.command,
-                            color = TerminalForeground.copy(alpha = 0.7f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             fontSize = 11.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -584,7 +584,7 @@ fun ProcessListCard(
                     Text("PID: ${proc.pid}")
                     Text("命令: ${proc.command}", maxLines = 2)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("选择终止信号:", color = TerminalForeground.copy(alpha = 0.7f))
+                    Text("选择终止信号:", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                 }
             },
             confirmButton = {

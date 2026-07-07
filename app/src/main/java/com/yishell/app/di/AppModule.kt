@@ -26,7 +26,7 @@ object AppModule {
             AppDatabase::class.java,
             "yishell.db"
         )
-            .fallbackToDestructiveMigration()
+            .addMigrations(AppDatabase.MIGRATION_4_5)
             .setQueryExecutor(Executors.newFixedThreadPool(4))
             .build()
     }

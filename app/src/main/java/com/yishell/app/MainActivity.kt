@@ -11,9 +11,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.yishell.app.data.local.AppSettings
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigation.compose.rememberNavController
 import com.yishell.app.data.local.SettingsDataStore
 import com.yishell.app.presentation.navigation.YiFeiNavHost
+import com.yishell.app.presentation.theme.LocalGlassEffect
 import com.yishell.app.presentation.theme.YiShellTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -30,12 +32,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by settingsDataStore.settings.collectAsState(initial = AppSettings())
             YiShellTheme(isDarkTheme = settings.isDarkTheme) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    val navController = rememberNavController()
-                    YiFeiNavHost(navController = navController)
+                // 玻璃效果开关通过 CompositionLocal 下发给所有 glass 修饰符
+                CompositionLocalProvider(LocalGlassEffect provides settings.glassEffect) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        val navController = rememberNavController()
+                        YiFeiNavHost(navController = navController)
+                    }
                 }
             }
         }

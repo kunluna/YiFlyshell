@@ -42,10 +42,10 @@ class SettingsViewModel @Inject constructor(
 
     fun resetTheme() {
         viewModelScope.launch {
-            settingsDataStore.updateDarkTheme(true)
+            settingsDataStore.updateDarkTheme(false)
             settingsDataStore.updateFontSize(14)
             settingsDataStore.updateDefaultPort(22)
-            settingsDataStore.updateTerminalColorScheme(TerminalColorScheme.DEFAULT)
+            settingsDataStore.updateTerminalColorScheme(TerminalColorScheme.AUTO)
             settingsDataStore.updateKeyboardLayout("[\"⏎ Enter\",\"␣ Space\",\"←\",\"↑\",\"→\",\"↓\",\"Esc\",\"Tab\",\"Ctrl\",\"Alt\",\";\",\"/\",\"|\",\"-\",\"_\",\"~\",\".\",\"历史↑\",\"历史↓\",\"PgUp\",\"PgDn\"]")
         }
     }

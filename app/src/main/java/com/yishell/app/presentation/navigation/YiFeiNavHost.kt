@@ -74,6 +74,9 @@ fun YiFeiNavHost(
                         },
                         onMonitor = {
                             navController.navigate(Screen.Monitor.createRoute(connectionId))
+                        },
+                        onEditConnection = {
+                            navController.navigate(Screen.EditConnection.createRoute(connectionId))
                         }
                     )
                 } else {

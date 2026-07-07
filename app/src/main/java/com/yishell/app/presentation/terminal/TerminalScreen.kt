@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SelectAll
@@ -71,6 +72,7 @@ fun TerminalScreen(
     onBack: () -> Unit,
     onSftp: () -> Unit = {},
     onMonitor: () -> Unit = {},
+    onEditConnection: () -> Unit = {},
     viewModel: TerminalViewModel = hiltViewModel()
 ) {
     var inputText by remember { mutableStateOf("") }
@@ -86,7 +88,9 @@ fun TerminalScreen(
     val showPortForwardDialog by viewModel.showPortForwardDialog.collectAsState()
 
     val terminalScheme by viewModel.terminalColorScheme.collectAsState()
-    val themeColors = remember(terminalScheme) { TerminalThemes.forScheme(terminalScheme) }
+    val isDark by viewModel.isDarkTheme.collectAsState()
+    val uiFontSize by viewModel.fontSize.collectAsState()
+    val themeColors = remember(terminalScheme, isDark) { TerminalThemes.resolve(terminalScheme, isDark) }
     val connectionName by viewModel.connectionName.collectAsState()
     val quickCommands by viewModel.quickCommands.collectAsState()
     var showQuickCommandEditor by remember { mutableStateOf(false) }
@@ -129,7 +133,7 @@ fun TerminalScreen(
             // 同时 Surface 的深色背景仍延伸到状态栏区域（沉浸式）。
             // 之前用自定义 Surface 绕过了 M3 TopAppBar 的 inset 机制，导致内容画到状态栏上。
             Surface(
-                color = TerminalBackground,
+                color = themeColors.background,
                 shadowElevation = 2.dp
             ) {
                 Row(
@@ -212,29 +216,34 @@ fun TerminalScreen(
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "更多操作",
-                                tint = TerminalForeground
+                                tint = themeColors.foreground
                             )
                         }
                         DropdownMenu(
                             expanded = showActionMenu,
                             onDismissRequest = { showActionMenu = false },
-                            modifier = Modifier.background(DarkSurface)
+                            modifier = Modifier.background(themeColors.background)
                         ) {
                             DropdownMenuItem(
-                                text = { Text("清屏", color = TerminalForeground) },
+                                text = { Text("编辑连接", color = themeColors.foreground) },
+                                onClick = { showActionMenu = false; onEditConnection() },
+                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = Cyan500, modifier = Modifier.size(18.dp)) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("清屏", color = themeColors.foreground) },
                                 onClick = { showActionMenu = false; viewModel.clearOutput() },
                                 leadingIcon = { Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = Cyan500, modifier = Modifier.size(18.dp)) }
                             )
                             DropdownMenuItem(
-                                text = { Text("端口转发", color = TerminalForeground) },
+                                text = { Text("端口转发", color = themeColors.foreground) },
                                 onClick = { showActionMenu = false; viewModel.showPortForwardDialog() },
                                 leadingIcon = { Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = Cyan500, modifier = Modifier.size(18.dp)) }
                             )
-                            HorizontalDivider(color = DarkSurfaceVariant)
+                            HorizontalDivider(color = themeColors.foreground.copy(alpha = 0.1f))
                             DropdownMenuItem(
                                 text = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("显示快捷键盘浮钮", color = TerminalForeground)
+                                        Text("显示快捷键盘浮钮", color = themeColors.foreground)
                                         Spacer(Modifier.width(8.dp))
                                         Switch(
                                             checked = showKeyboardFab,
@@ -247,7 +256,7 @@ fun TerminalScreen(
                             DropdownMenuItem(
                                 text = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("显示快捷命令栏", color = TerminalForeground)
+                                        Text("显示快捷命令栏", color = themeColors.foreground)
                                         Spacer(Modifier.width(8.dp))
                                         Switch(
                                             checked = showQuickCommandsBar,
@@ -258,7 +267,7 @@ fun TerminalScreen(
                                 onClick = { showQuickCommandsBar = !showQuickCommandsBar }
                             )
                             DropdownMenuItem(
-                                text = { Text("编辑快捷命令", color = TerminalForeground) },
+                                text = { Text("编辑快捷命令", color = themeColors.foreground) },
                                 onClick = { showQuickCommandEditor = true }
                             )
                         }
@@ -281,7 +290,7 @@ fun TerminalScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .imePadding()
-                .background(TerminalBackground)
+                .background(themeColors.background)
         ) {
             // P1-1：已移除假的"多会话"tab 栏。
             // 原 addSession 只创建 UI 状态而不开新 SSH session，所有 tab 共享同一 shell，
@@ -310,7 +319,7 @@ fun TerminalScreen(
                 AnsiParserOptimized.parse(terminalOutput, themeColors.foreground)
             }
             val uriHandler = LocalUriHandler.current
-            val textStyle = TextStyle(color = themeColors.foreground, fontSize = 14.sp, fontFamily = FontFamily.Monospace)
+            val textStyle = TextStyle(color = themeColors.foreground, fontSize = uiFontSize.sp, fontFamily = FontFamily.Monospace)
 
             // 选择模式快照：进入选择模式时冻结当前文本
             val selectionSnapshot = remember { mutableStateOf<AnnotatedString?>(null) }
@@ -483,7 +492,7 @@ fun TerminalScreen(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(12.dp),
-                        containerColor = DarkSurfaceVariant,
+                        containerColor = themeColors.foreground.copy(alpha = 0.1f),
                         contentColor = Green500
                     ) {
                         Icon(
@@ -501,7 +510,7 @@ fun TerminalScreen(
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .padding(8.dp),
-                        color = DarkSurface,
+                        color = themeColors.background,
                         shape = RoundedCornerShape(12.dp),
                         tonalElevation = 8.dp,
                         shadowElevation = 8.dp
@@ -612,7 +621,7 @@ fun TerminalScreen(
                                 Icon(
                                     imageVector = Icons.Default.KeyboardArrowDown,
                                     contentDescription = "收起键盘",
-                                    tint = TerminalForeground,
+                                    tint = themeColors.foreground,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -622,7 +631,7 @@ fun TerminalScreen(
             }
             if (selectionMode) {
                 Surface(
-                    color = DarkSurface,
+                    color = themeColors.background,
                     tonalElevation = 4.dp
                 ) {
                     Row(
@@ -633,7 +642,7 @@ fun TerminalScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
  TextButton(onClick = { selectionMode = false; selAnchorA = null; selAnchorB = null }) {
-                            Text("取消", color = TerminalForeground)
+                            Text("取消", color = themeColors.foreground)
                         }
                         Row {
                             TextButton(onClick = {
@@ -675,19 +684,19 @@ fun TerminalScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(DarkSurface)
+                        .background(themeColors.background)
                         .padding(vertical = 6.dp)
                         .horizontalScroll(rememberScrollState()),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Spacer(modifier = Modifier.width(8.dp))
                     if (quickCommands.isEmpty()) {
-                        Text("暂无快捷命令", color = TerminalForeground.copy(alpha = 0.5f), fontSize = 12.sp)
+                        Text("暂无快捷命令", color = themeColors.foreground.copy(alpha = 0.5f), fontSize = 12.sp)
                     } else {
                         quickCommands.forEach { qc ->
                             Surface(
                                 shape = RoundedCornerShape(16.dp),
-                                color = DarkSurfaceVariant,
+                                color = themeColors.foreground.copy(alpha = 0.1f),
                                 modifier = Modifier.clickable {
                                     viewModel.sendCommand(qc.command)
                                     inputText = ""
@@ -758,7 +767,7 @@ fun TerminalScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "发送",
-                        tint = if (connectionState is ConnectionState.Connected) Green500 else TerminalForeground.copy(alpha = 0.3f)
+                        tint = if (connectionState is ConnectionState.Connected) Green500 else themeColors.foreground.copy(alpha = 0.3f)
                     )
                 }
             }
@@ -836,9 +845,9 @@ fun TerminalScreen(
     if (showExitDialog) {
         AlertDialog(
             onDismissRequest = { showExitDialog = false },
-            title = { Text("确认退出", color = TerminalForeground) },
-            containerColor = DarkSurface,
-            text = { Text("确定要断开连接并退出终端吗？", color = TerminalForeground) },
+            title = { Text("确认退出", color = themeColors.foreground) },
+            containerColor = themeColors.background,
+            text = { Text("确定要断开连接并退出终端吗？", color = themeColors.foreground) },
             confirmButton = {
                 TextButton(onClick = {
                     showExitDialog = false
@@ -850,7 +859,7 @@ fun TerminalScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showExitDialog = false }) {
-                    Text("取消", color = TerminalForeground)
+                    Text("取消", color = themeColors.foreground)
                 }
             }
         )
@@ -865,10 +874,10 @@ fun TerminalScreen(
             title = {
                 Text(
                     if (pendingHostKey.isMismatch) "⚠ 主机指纹已变更" else "确认主机指纹",
-                    color = if (pendingHostKey.isMismatch) Danger else TerminalForeground
+                    color = if (pendingHostKey.isMismatch) Danger else themeColors.foreground
                 )
             },
-            containerColor = DarkSurface,
+            containerColor = themeColors.background,
             text = {
                 Column {
                     if (pendingHostKey.isMismatch) {
@@ -883,15 +892,15 @@ fun TerminalScreen(
                         Spacer(Modifier.height(12.dp))
                         Text(
                             "主机: ${pendingHostKey.hostname}:${pendingHostKey.port}",
-                            color = TerminalForeground, fontSize = 13.sp
+                            color = themeColors.foreground, fontSize = 13.sp
                         )
                         Text(
                             "算法: ${pendingHostKey.algorithm}",
-                            color = TerminalForeground, fontSize = 13.sp
+                            color = themeColors.foreground, fontSize = 13.sp
                         )
                         Text(
                             "原指纹: ${pendingHostKey.storedFingerprint}",
-                            color = TerminalForeground, fontSize = 12.sp
+                            color = themeColors.foreground, fontSize = 12.sp
                         )
                         Text(
                             "新指纹: ${pendingHostKey.fingerprint}",
@@ -901,18 +910,18 @@ fun TerminalScreen(
                         Text(
                             "首次连接该主机，请确认服务器指纹是否正确。\n" +
                                 "你可对比服务器管理员提供的指纹，不一致请拒绝。",
-                            color = TerminalForeground,
+                            color = themeColors.foreground,
                             fontSize = 13.sp,
                             lineHeight = 18.sp
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
                             "主机: ${pendingHostKey.hostname}:${pendingHostKey.port}",
-                            color = TerminalForeground, fontSize = 13.sp
+                            color = themeColors.foreground, fontSize = 13.sp
                         )
                         Text(
                             "算法: ${pendingHostKey.algorithm}",
-                            color = TerminalForeground, fontSize = 13.sp
+                            color = themeColors.foreground, fontSize = 13.sp
                         )
                         Text(
                             "指纹: ${pendingHostKey.fingerprint}",
@@ -980,7 +989,7 @@ fun KeyboardButton(label: String, onClick: () -> Unit) {
             .width(48.dp)
             .lightGlassButton()
             .clip(RoundedCornerShape(6.dp))
-            .background(DarkSurfaceVariant)
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -1003,7 +1012,7 @@ fun KeyboardIconButton(icon: androidx.compose.ui.graphics.vector.ImageVector, on
             .width(48.dp)
             .lightGlassButton()
             .clip(RoundedCornerShape(6.dp))
-            .background(DarkSurfaceVariant)
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -1024,7 +1033,7 @@ fun KeyboardToggleButton(label: String, isActive: Boolean, onClick: () -> Unit) 
             .width(48.dp)
             .lightGlassButton()
             .clip(RoundedCornerShape(6.dp))
-            .background(if (isActive) Cyan500 else DarkSurfaceVariant)
+            .background(if (isActive) Cyan500 else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -1051,8 +1060,8 @@ fun PortForwardingDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("端口转发", color = TerminalForeground) },
-        containerColor = DarkSurface,
+        title = { Text("端口转发", color = MaterialTheme.colorScheme.onSurface) },
+        containerColor = MaterialTheme.colorScheme.surface,
         text = {
             Column(
                 modifier = Modifier
@@ -1072,7 +1081,7 @@ fun PortForwardingDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(DarkSurfaceVariant, RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                                 .padding(8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -1085,7 +1094,7 @@ fun PortForwardingDialog(
                                 )
                                 Text(
                                     text = "${pf.localPort} → ${pf.remoteHost}:${pf.remotePort}",
-                                    color = TerminalForeground,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 12.sp,
                                     fontFamily = FontFamily.Monospace
                                 )
@@ -1103,7 +1112,7 @@ fun PortForwardingDialog(
                             }
                         }
                     }
-                    HorizontalDivider(color = DarkSurfaceVariant)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                 }
 
                 // Add new forwarding
@@ -1144,7 +1153,7 @@ fun PortForwardingDialog(
                     label = { Text(if (type == PortForwardingType.LOCAL) "本地端口" else "远程端口") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    textStyle = TextStyle(color = TerminalForeground, fontFamily = FontFamily.Monospace)
+                    textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontFamily = FontFamily.Monospace)
                 )
 
                 OutlinedTextField(
@@ -1153,7 +1162,7 @@ fun PortForwardingDialog(
                     label = { Text("目标主机") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    textStyle = TextStyle(color = TerminalForeground, fontFamily = FontFamily.Monospace)
+                    textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontFamily = FontFamily.Monospace)
                 )
 
                 OutlinedTextField(
@@ -1162,7 +1171,7 @@ fun PortForwardingDialog(
                     label = { Text("目标端口") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    textStyle = TextStyle(color = TerminalForeground, fontFamily = FontFamily.Monospace)
+                    textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontFamily = FontFamily.Monospace)
                 )
             }
         },
@@ -1190,7 +1199,7 @@ fun PortForwardingDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("关闭", color = TerminalForeground)
+                Text("关闭", color = MaterialTheme.colorScheme.onSurface)
             }
         }
     )

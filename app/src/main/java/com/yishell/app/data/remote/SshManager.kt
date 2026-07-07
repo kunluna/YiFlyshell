@@ -68,6 +68,7 @@ class SshManager @Inject constructor(
         val username: String,
         val host: String,
         val color: ConnectionColor,
+        val customIconUri: String? = null,
         val connectedAt: Long
     )
 
@@ -208,6 +209,7 @@ class SshManager @Inject constructor(
                     username = config.username,
                     host = config.host,
                     color = config.color,
+                    customIconUri = config.customIconUri,
                     connectedAt = System.currentTimeMillis()
                 ))
             }
@@ -240,6 +242,49 @@ class SshManager @Inject constructor(
             managed.stdin?.flush()
         } catch (e: Exception) {
             Log.e(TAG, "sendInput failed: ${e.message}", e)
+        }
+    }
+
+    /**
+     * 在已建立的连接上执行单条命令并返回输出（非交互式 exec channel）。
+     * 用于连接成功后获取 hostname 等轻量信息，不影响主 shell 会话。
+     */
+    suspend fun executeSingleCommand(connectionId: String, command: String): String? = withContext(Dispatchers.IO) {
+        val managed = synchronized(lock) { managedConnections[connectionId] } ?: return@withContext null
+        var execSession: Session? = null
+        try {
+            execSession = managed.connection.openSession()
+            execSession.execCommand(command)
+            val output = execSession.getStdout()?.bufferedReader()?.use { it.readText() }
+            output?.trim()
+        } catch (e: Exception) {
+            Log.e(TAG, "executeSingleCommand failed: ${e.message}", e)
+            null
+        } finally {
+            try { execSession?.close() } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * 更新已连接会话的显示名称（用于连接成功后自动回填设备名）。
+     */
+    fun updateConnectionName(connectionId: String, newName: String) {
+        synchronized(lock) {
+            val current = _activeConnections.value[connectionId] ?: return
+            _activeConnections.value = _activeConnections.value + (connectionId to current.copy(name = newName))
+        }
+    }
+
+    /**
+     * 从数据库重新加载连接的 color 和 customIconUri 并更新 SSOT。
+     * 用于编辑连接后刷新已连接卡片的图标显示。
+     */
+    fun refreshConnectionMetadata(connectionId: String, color: ConnectionColor, customIconUri: String?) {
+        synchronized(lock) {
+            val current = _activeConnections.value[connectionId] ?: return
+            _activeConnections.value = _activeConnections.value + (
+                connectionId to current.copy(color = color, customIconUri = customIconUri)
+            )
         }
     }
 

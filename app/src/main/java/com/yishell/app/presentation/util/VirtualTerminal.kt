@@ -49,7 +49,16 @@ class VirtualTerminal(private var width: Int = 80, private val maxLines: Int = 5
                     i++
                 }
                 ch == '\b' -> {
-                    if (cursorCol > 0) cursorCol--
+                    if (cursorCol > 0) {
+                        cursorCol--
+                        // 删除光标处的字符
+                        if (cursorRow < buffer.size) {
+                            val line = buffer[cursorRow]
+                            if (cursorCol < line.size) {
+                                line.removeAt(cursorCol)
+                            }
+                        }
+                    }
                     i++
                 }
                 ch == '\t' -> {
@@ -58,6 +67,10 @@ class VirtualTerminal(private var width: Int = 80, private val maxLines: Int = 5
                     i++
                 }
                 ch == '\u0007' -> {
+                    i++
+                }
+                ch == '\u0000' -> {
+                    // 忽略 NUL 字符
                     i++
                 }
                 else -> {
@@ -208,6 +221,11 @@ class VirtualTerminal(private var width: Int = 80, private val maxLines: Int = 5
             'D' -> {
                 val n = params.getOrElse(0) { 1 }.coerceAtLeast(1)
                 cursorCol = (cursorCol - n).coerceAtLeast(0)
+            }
+            'G' -> {
+                // CSI G: 光标移到指定列（1-based）
+                val n = params.getOrElse(0) { 1 }.coerceAtLeast(1)
+                cursorCol = (n - 1).coerceAtMost(width - 1).coerceAtLeast(0)
             }
             'H', 'f' -> {
                 val row = (params.getOrElse(0) { 1 }).coerceAtLeast(1) - 1
@@ -429,7 +447,7 @@ class VirtualTerminal(private var width: Int = 80, private val maxLines: Int = 5
     private fun getOutput(): String {
         val sb = StringBuilder()
         var lastSgr = ""
-        for (row in buffer) {
+        for ((rowIndex, row) in buffer.withIndex()) {
             for (cell in row) {
                 val sgr = buildSgrParams(cell)
                 if (sgr != lastSgr) {
@@ -444,14 +462,14 @@ class VirtualTerminal(private var width: Int = 80, private val maxLines: Int = 5
                 }
                 sb.append(cell.char)
             }
-            if (lastSgr.isNotEmpty()) {
-                sb.append("\u001b[0m")
-                lastSgr = ""
+            // 仅在非最后一行添加换行，避免重复换行
+            if (rowIndex < buffer.size - 1) {
+                if (lastSgr.isNotEmpty()) {
+                    sb.append("\u001b[0m")
+                    lastSgr = ""
+                }
+                sb.append("\n")
             }
-            sb.append("\n")
-        }
-        if (sb.isNotEmpty() && sb.last() == '\n') {
-            sb.deleteCharAt(sb.length - 1)
         }
         return sb.toString()
     }

@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.SpaceBar
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
@@ -45,7 +46,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
-import com.yishell.app.presentation.util.AnsiParserOptimized
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,6 +73,7 @@ fun TerminalScreen(
     onSftp: () -> Unit = {},
     onMonitor: () -> Unit = {},
     onEditConnection: () -> Unit = {},
+    onViewLogs: () -> Unit = {},
     viewModel: TerminalViewModel = hiltViewModel()
 ) {
     var inputText by remember { mutableStateOf("") }
@@ -270,6 +271,12 @@ fun TerminalScreen(
                                 text = { Text("编辑快捷命令", color = themeColors.foreground) },
                                 onClick = { showQuickCommandEditor = true }
                             )
+                            HorizontalDivider(color = themeColors.foreground.copy(alpha = 0.1f))
+                            DropdownMenuItem(
+                                text = { Text("查看日志", color = themeColors.foreground) },
+                                onClick = { showActionMenu = false; onViewLogs() },
+                                leadingIcon = { Icon(Icons.Default.Description, contentDescription = null, tint = Cyan500, modifier = Modifier.size(18.dp)) }
+                            )
                         }
                     }
                 }
@@ -315,9 +322,9 @@ fun TerminalScreen(
             // 3. 选择模式期间快照 annotatedOutput，防止新输出改变偏移
             // 4. 选择模式用 Text 替代 ClickableText，避免手势冲突
 
-            val annotatedOutput = remember(terminalOutput) {
-                AnsiParserOptimized.parse(terminalOutput, themeColors.foreground)
-            }
+            // 单层解析：TerminalEmulator 直接返回 AnnotatedString
+            // 不再需要 AnsiParserOptimized 二次解析
+            val annotatedOutput = terminalOutput
             val uriHandler = LocalUriHandler.current
             val textStyle = TextStyle(color = themeColors.foreground, fontSize = uiFontSize.sp, fontFamily = FontFamily.Monospace)
 

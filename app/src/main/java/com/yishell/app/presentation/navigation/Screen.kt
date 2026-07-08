@@ -22,5 +22,6 @@ sealed class Screen(val route: String) {
         fun createRoute(connectionId: String) = "edit_connection/${URLEncoder.encode(connectionId, "UTF-8")}"
     }
     data object About : Screen("about")
+    data object TerminalLogs : Screen("terminal_logs")
 
 }

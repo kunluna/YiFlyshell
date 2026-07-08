@@ -21,6 +21,7 @@ import com.yishell.app.presentation.settings.ConnectionSettingsScreen
 import com.yishell.app.presentation.settings.SettingsScreen
 import com.yishell.app.presentation.settings.TerminalSettingsScreen
 import com.yishell.app.presentation.terminal.TerminalScreen
+import com.yishell.app.presentation.terminal.TerminalLogsScreen
 @Composable
 fun YiFeiNavHost(
     navController: NavHostController,
@@ -66,19 +67,22 @@ fun YiFeiNavHost(
             ) { backStackEntry ->
                 val connectionId = backStackEntry.arguments?.getString("connectionId") ?: ""
                 if (connectionId.isNotBlank()) {
-                    TerminalScreen(
-                        connectionId = connectionId,
-                        onBack = { navController.popBackStack() },
-                        onSftp = {
-                            navController.navigate(Screen.Sftp.createRoute(connectionId))
-                        },
-                        onMonitor = {
-                            navController.navigate(Screen.Monitor.createRoute(connectionId))
-                        },
-                        onEditConnection = {
-                            navController.navigate(Screen.EditConnection.createRoute(connectionId))
-                        }
-                    )
+                TerminalScreen(
+                    connectionId = connectionId,
+                    onBack = { navController.popBackStack() },
+                    onSftp = {
+                        navController.navigate(Screen.Sftp.createRoute(connectionId))
+                    },
+                    onMonitor = {
+                        navController.navigate(Screen.Monitor.createRoute(connectionId))
+                    },
+                    onEditConnection = {
+                        navController.navigate(Screen.EditConnection.createRoute(connectionId))
+                    },
+                    onViewLogs = {
+                        navController.navigate(Screen.TerminalLogs.route)
+                    }
+                )
                 } else {
                     navController.popBackStack()
                 }
@@ -163,6 +167,12 @@ fun YiFeiNavHost(
             composable(Screen.About.route) {
                 AboutScreen(
                     onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.TerminalLogs.route) {
+                TerminalLogsScreen(
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
 

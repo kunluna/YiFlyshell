@@ -21,8 +21,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import com.yishell.app.data.local.SettingsDataStore
 import com.yishell.app.data.local.TerminalColorScheme
-import com.yishell.app.presentation.util.AnsiParserOptimized
-import com.yishell.app.presentation.util.VirtualTerminal
+import com.yishell.app.data.local.TerminalLogger
+import androidx.compose.ui.text.AnnotatedString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,8 +59,8 @@ class TerminalViewModel @Inject constructor(
 
     private val connectionId: String = savedStateHandle["connectionId"] ?: ""
 
-    private val _terminalOutput = MutableStateFlow("")
-    val terminalOutput: StateFlow<String> = _terminalOutput.asStateFlow()
+    private val _terminalOutput = MutableStateFlow<AnnotatedString>(AnnotatedString(""))
+    val terminalOutput: StateFlow<AnnotatedString> = _terminalOutput.asStateFlow()
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
@@ -69,10 +69,13 @@ class TerminalViewModel @Inject constructor(
     val quickCommands: StateFlow<List<QuickCommand>> = _quickCommands.asStateFlow()
 
     private var outputReaderJob: Job? = null
-    private var outputBuffer = StringBuilder()
     private val outputLock = Any()
     private var currentSessionId: String? = null
-    private val virtualTerminal = VirtualTerminal()
+    // 单层终端模拟器，替代原来的 VirtualTerminal + AnsiParserOptimized 双层架构
+    private val terminalEmulator = com.yishell.app.presentation.util.TerminalEmulator()
+    
+    // 终端日志记录器
+    private val terminalLogger = TerminalLogger(appContext)
 
     private val _ctrlActive = MutableStateFlow(false)
     val ctrlActive: StateFlow<Boolean> = _ctrlActive.asStateFlow()
@@ -235,6 +238,10 @@ class TerminalViewModel @Inject constructor(
                 connectionStartTime = System.currentTimeMillis()
                 startStatsTimer()
                 appendOutput("已连接到 ${config.host}\n\n")
+                
+                // 开始日志记录
+                terminalLogger.startSession(currentSessionId ?: UUID.randomUUID().toString())
+                
                 currentSessionId = try {
                     connectionRepository.startSession(connectionId)
                 } catch (e: Exception) {
@@ -456,33 +463,27 @@ class TerminalViewModel @Inject constructor(
     }
 
     fun copyOutputToClipboard() {
-        val text = _terminalOutput.value
-        if (text.isNotBlank()) {
-            val stripped = AnsiParserOptimized.stripAllAnsi(text)
+        val annotatedText = _terminalOutput.value
+        if (annotatedText.text.isNotBlank()) {
+            // 单层解析：直接取 AnnotatedString 的纯文本部分
             val clipboard = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("terminal_output", stripped)
+            val clip = ClipData.newPlainText("terminal_output", annotatedText.text)
             clipboard.setPrimaryClip(clip)
-            _copyFeedback.value = "已复制 ${stripped.length} 字符"
+            _copyFeedback.value = "已复制 ${annotatedText.text.length} 字符"
         }
     }
 
     /**
      * 双光标选择模式：复制终端输出中 [start, end) 区间的纯文本。
-     * 区间基于 _terminalOutput 的**原始字符串**偏移（含 ANSI 序列），
-     * 先剥离 ANSI 后提取可见文本的对应区间。
-     *
-     * 第一性原理：用户在屏幕上看到的是已渲染的可见文本，选择区间也应映射到可见文本。
-     * 但 UI 层拿到的 offset 是 AnnotatedString 的偏移（已跳过 ANSI），
-     * 所以直接对 stripped 文本截取即可。
+     * 单层解析后，AnnotatedString 直接包含纯文本，无需再剥离 ANSI。
      */
     fun copySelectedText(start: Int, end: Int) {
-        val text = _terminalOutput.value
-        if (text.isBlank()) return
-        val stripped = AnsiParserOptimized.stripAllAnsi(text)
-        val s = start.coerceIn(0, stripped.length)
-        val e = end.coerceIn(0, stripped.length)
+        val annotatedText = _terminalOutput.value
+        if (annotatedText.text.isBlank()) return
+        val s = start.coerceIn(0, annotatedText.text.length)
+        val e = end.coerceIn(0, annotatedText.text.length)
         if (s >= e) return
-        val selected = stripped.substring(s, e)
+        val selected = annotatedText.text.substring(s, e)
         val clipboard = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("terminal_selection", selected)
         clipboard.setPrimaryClip(clip)
@@ -568,24 +569,27 @@ class TerminalViewModel @Inject constructor(
 
     fun clearOutput() {
         synchronized(outputLock) {
-            outputBuffer.clear()
-            virtualTerminal.reset()
+            terminalEmulator.reset()
         }
-        _terminalOutput.value = ""
+        _terminalOutput.value = AnnotatedString("")
     }
 
     fun reconnect() {
         reconnectAttempts = 0
         synchronized(outputLock) {
-            outputBuffer.clear()
+            terminalEmulator.reset()
         }
-        _terminalOutput.value = ""
+        _terminalOutput.value = AnnotatedString("")
         connect()
     }
 
     fun disconnect() {
         stopStatsTimer()
         outputReaderJob?.cancel()
+        
+        // 结束日志记录
+        terminalLogger.endSession()
+        
         currentSessionId?.let { sessionId ->
             viewModelScope.launch(exceptionHandler) {
                 try {
@@ -762,43 +766,18 @@ class TerminalViewModel @Inject constructor(
 
     private fun appendOutput(text: String) {
         synchronized(outputLock) {
-            // P2-1（\e hack 根因澄清，Feynman 破妄）：
-            // 此 replace 不是在修 SSH 库的 bug——trilead 的 readOutput 用 String(buffer,0,read)
-            // 解码字节流，ESC(0x1B) 会正确解码为 \u001b，不会产生字面 "\e"。
-            // 字面 "\e" 的真实来源是【服务器端】：某些 shell 的 `echo "\e[31m"`（未加 -e）、
-            // 部分 PS1 配置、或脚本里 printf 未展开的转义会向 stdout 输出字面 '\','e' 两字符。
-            // 这里把它们转回真正的 ESC，让 VirtualTerminal 的 ANSI 解析能正确着色。
-            // 保留此防御性替换，但澄清真相以消除"自欺"。
+            // 单层解析：直接处理输入并生成 AnnotatedString
+            // 不再经过 VirtualTerminal + AnsiParserOptimized 双层转换
             val processed = text.replace("\\e", "\u001b")
-            val result = virtualTerminal.process(processed)
-            outputBuffer = StringBuilder(result)
-            if (outputBuffer.length > 100_000) {
-                val full = outputBuffer.toString()
-                val tail = full.takeLast(50_000)
-                var start = 0
-                while (start < tail.length && tail[start] == '\u001b') {
-                    if (start + 1 < tail.length && tail[start + 1] == '[') {
-                        val mIdx = tail.indexOf('m', start + 2)
-                        if (mIdx >= 0) {
-                            start = mIdx + 1
-                        } else {
-                            start = tail.length
-                        }
-                    } else if (start + 1 < tail.length && tail[start + 1] == ']') {
-                        var j = start + 2
-                        while (j < tail.length) {
-                            if (tail[j] == '\u0007') { j++; break }
-                            if (tail[j] == '\u001b' && j + 1 < tail.length && tail[j + 1] == '\\') { j += 2; break }
-                            j++
-                        }
-                        start = j
-                    } else {
-                        start = minOf(start + 2, tail.length)
-                    }
-                }
-                outputBuffer = StringBuilder("\u001b[0m" + tail.substring(start))
+            _terminalOutput.value = terminalEmulator.process(processed)
+            
+            // 记录到日志（只记录新增的纯文本，不含 ANSI 序列）
+            // 过滤掉控制字符，只保留可打印字符和换行
+            val plainText = text.replace(Regex("\u001b\\[[0-9;?]*[a-zA-Z]"), "") // 移除 ANSI 序列
+                .replace(Regex("[^\u0020-\u007E\u000A\u000D]"), "") // 只保留可打印 ASCII 和换行
+            if (plainText.isNotBlank()) {
+                terminalLogger.log(plainText)
             }
-            _terminalOutput.value = outputBuffer.toString()
         }
     }
 
@@ -835,6 +814,10 @@ class TerminalViewModel @Inject constructor(
         stopStatsTimer()
         statsTimerJob?.cancel()
         outputReaderJob?.cancel()
+        
+        // 释放日志记录器资源
+        terminalLogger.release()
+        
         currentSessionId?.let { sessionId ->
             viewModelScope.launch(exceptionHandler) {
                 try {

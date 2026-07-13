@@ -18,6 +18,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.yishell.app.data.local.IconBreathMode
+import com.yishell.app.presentation.home.HomeViewModel
 import com.yishell.app.presentation.theme.TerminalThemes
 import com.yishell.app.presentation.theme.whiteGlassCard
 
@@ -79,16 +81,59 @@ fun AppearanceSettingsScreen(
                 )
             }
 
+            HorizontalDivider()
+
             Text(
-                text = "字体大小: ${settings.fontSize}sp",
-                style = MaterialTheme.typography.bodyLarge
+                text = "已连接图标动效",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
             )
-            Slider(
-                value = settings.fontSize.toFloat(),
-                onValueChange = { viewModel.updateFontSize(it.toInt()) },
-                valueRange = 10f..24f,
-                steps = 6
+            Text(
+                text = "仅影响首页已连接卡片的图标",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            IconBreathMode.entries.forEach { mode ->
+                val modeLabel = when (mode) {
+                    IconBreathMode.OFF -> "关闭"
+                    IconBreathMode.SLOW -> "缓慢呼吸"
+                    IconBreathMode.FAST -> "快速脉冲"
+                }
+                val modeDesc = when (mode) {
+                    IconBreathMode.OFF -> "静态图标，无动效"
+                    IconBreathMode.SLOW -> "3秒周期，柔和呼吸"
+                    IconBreathMode.FAST -> "1秒周期，明显脉冲"
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .then(
+                            if (settings.iconBreathMode == mode) {
+                                Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .clickable { viewModel.updateIconBreathMode(mode) }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(modeLabel, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            modeDesc,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    RadioButton(
+                        selected = settings.iconBreathMode == mode,
+                        onClick = { viewModel.updateIconBreathMode(mode) }
+                    )
+                }
+            }
         }
     }
 }
@@ -122,6 +167,25 @@ fun TerminalSettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            Text(
+                text = "字体大小",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Text(
+                text = "${settings.fontSize}sp",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Slider(
+                value = settings.fontSize.toFloat(),
+                onValueChange = { viewModel.updateFontSize(it.toInt()) },
+                valueRange = 10f..24f,
+                steps = 6
+            )
+
+            HorizontalDivider()
+
             Text(
                 text = "终端键盘布局",
                 style = MaterialTheme.typography.titleMedium,
@@ -257,6 +321,161 @@ fun ConnectionSettingsScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true
             )
+
+            HorizontalDivider()
+
+            Text(
+                text = "默认端口",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            OutlinedTextField(
+                value = settings.defaultPort.toString(),
+                onValueChange = { value ->
+                    value.toIntOrNull()?.let { port ->
+                        if (port in 1..65535) viewModel.updateDefaultPort(port)
+                    }
+                },
+                label = { Text("新建连接默认端口") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true
+            )
+
+            HorizontalDivider()
+
+            Text(
+                text = "收藏显示数量请在收藏管理页面调整",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DataManagementSettingsScreen(
+    onBack: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel()
+) {
+    val settings by viewModel.settings.collectAsState()
+    val homeViewModel: com.yishell.app.presentation.home.HomeViewModel = hiltViewModel()
+    val backupMessage by homeViewModel.backupMessage.collectAsState()
+    val availableBackups by homeViewModel.availableBackups.collectAsState()
+    var showRestoreDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        homeViewModel.loadBackups()
+    }
+
+    if (showRestoreDialog) {
+        AlertDialog(
+            onDismissRequest = { showRestoreDialog = false },
+            title = { Text("选择备份文件恢复") },
+            text = {
+                Column {
+                    if (availableBackups.isEmpty()) {
+                        Text("暂无可用备份文件")
+                    } else {
+                        availableBackups.forEach { file ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        homeViewModel.restoreFromBackup(file)
+                                        showRestoreDialog = false
+                                    }
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = file.name,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    text = "${file.length() / 1024}KB",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showRestoreDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    backupMessage?.let { msg ->
+        LaunchedEffect(msg) {
+            kotlinx.coroutines.delay(3000)
+            homeViewModel.clearBackupMessage()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("数据管理") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            Text(
+                text = "备份与恢复",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Text(
+                text = "备份所有连接配置到本地文件，可用于换手机或重装应用时恢复。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Button(
+                onClick = { homeViewModel.createFullBackup() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("创建备份")
+            }
+
+            OutlinedButton(
+                onClick = {
+                    homeViewModel.loadBackups()
+                    showRestoreDialog = true
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("从备份恢复")
+            }
+
+            backupMessage?.let { msg ->
+                Text(
+                    text = msg,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (msg.contains("成功")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }

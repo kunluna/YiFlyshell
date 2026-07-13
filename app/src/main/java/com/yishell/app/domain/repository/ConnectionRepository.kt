@@ -11,6 +11,7 @@ interface ConnectionRepository {
     suspend fun updateConnection(connection: ConnectionConfig)
     suspend fun deleteConnection(connection: ConnectionConfig)
     suspend fun updateLastConnected(id: String, timestamp: Long)
+    suspend fun updateFavoriteOrder(id: String, order: Int)
     suspend fun duplicateConnection(id: String, newName: String): String?
     fun saveTempConnection(config: ConnectionConfig)
     fun getTempConnection(id: String): ConnectionConfig?

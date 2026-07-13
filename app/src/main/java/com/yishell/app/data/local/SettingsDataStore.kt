@@ -26,6 +26,12 @@ enum class TerminalColorScheme {
     DRACULA
 }
 
+enum class IconBreathMode {
+    OFF,
+    SLOW,
+    FAST
+}
+
 data class AppSettings(
     val isDarkTheme: Boolean = false,
     val defaultPort: Int = 22,
@@ -35,7 +41,9 @@ data class AppSettings(
     val glassEffect: Boolean = true,
     val sshTimeout: Int = 30,
     val autoReconnect: Boolean = true,
-    val keepAliveInterval: Int = 60
+    val keepAliveInterval: Int = 60,
+    val iconBreathMode: IconBreathMode = IconBreathMode.SLOW,
+    val favoriteDisplayCount: Int = 3
 )
 
 @Singleton
@@ -54,6 +62,8 @@ class SettingsDataStore @Inject constructor(
         val SSH_TIMEOUT = intPreferencesKey("ssh_timeout")
         val AUTO_RECONNECT = booleanPreferencesKey("auto_reconnect")
         val KEEP_ALIVE_INTERVAL = intPreferencesKey("keep_alive_interval")
+        val ICON_BREATH_MODE = stringPreferencesKey("icon_breath_mode")
+        val FAVORITE_DISPLAY_COUNT = intPreferencesKey("favorite_display_count")
     }
 
     val settings: Flow<AppSettings> = dataStore.data.map { prefs ->
@@ -71,7 +81,13 @@ class SettingsDataStore @Inject constructor(
             glassEffect = prefs[Keys.GLASS_EFFECT] ?: true,
             sshTimeout = prefs[Keys.SSH_TIMEOUT] ?: 30,
             autoReconnect = prefs[Keys.AUTO_RECONNECT] ?: true,
-            keepAliveInterval = prefs[Keys.KEEP_ALIVE_INTERVAL] ?: 60
+            keepAliveInterval = prefs[Keys.KEEP_ALIVE_INTERVAL] ?: 60,
+            iconBreathMode = try {
+                IconBreathMode.valueOf(prefs[Keys.ICON_BREATH_MODE] ?: "SLOW")
+            } catch (e: Exception) {
+                IconBreathMode.SLOW
+            },
+            favoriteDisplayCount = prefs[Keys.FAVORITE_DISPLAY_COUNT] ?: 3
         )
     }
 
@@ -109,5 +125,13 @@ class SettingsDataStore @Inject constructor(
 
     suspend fun updateKeepAliveInterval(value: Int) {
         dataStore.edit { it[Keys.KEEP_ALIVE_INTERVAL] = value }
+    }
+
+    suspend fun updateIconBreathMode(mode: IconBreathMode) {
+        dataStore.edit { it[Keys.ICON_BREATH_MODE] = mode.name }
+    }
+
+    suspend fun updateFavoriteDisplayCount(count: Int) {
+        dataStore.edit { it[Keys.FAVORITE_DISPLAY_COUNT] = count }
     }
 }

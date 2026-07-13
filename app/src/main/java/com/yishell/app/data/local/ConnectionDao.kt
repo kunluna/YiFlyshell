@@ -25,6 +25,9 @@ interface ConnectionDao {
     @Query("UPDATE connections SET lastConnected = :timestamp WHERE id = :id")
     suspend fun updateLastConnected(id: String, timestamp: Long)
 
+    @Query("UPDATE connections SET favoriteOrder = :order WHERE id = :id")
+    suspend fun updateFavoriteOrder(id: String, order: Int)
+
     @Query("SELECT * FROM connections WHERE name = :name LIMIT 1")
     suspend fun getByName(name: String): ConnectionConfig?
 

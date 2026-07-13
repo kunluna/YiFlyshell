@@ -69,11 +69,11 @@ fun Modifier.whiteGlassCard(): Modifier {
     return this
         .shadow(
             elevation = 8.dp,
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             ambientColor = Color.Black.copy(alpha = 0.08f),
             spotColor = Color.Black.copy(alpha = 0.08f)
         )
-        .clip(RoundedCornerShape(20.dp))
+        .clip(RoundedCornerShape(24.dp))
         .then(
             if (isLight) {
                 background(Color.White.copy(alpha = 0.92f))
@@ -86,7 +86,7 @@ fun Modifier.whiteGlassCard(): Modifier {
                                 Color.White.copy(alpha = 0.8f)
                             )
                         ),
-                        shape = RoundedCornerShape(20.dp)
+                        shape = RoundedCornerShape(24.dp)
                     )
             } else {
                 background(DarkGlassBackground)
@@ -99,7 +99,7 @@ fun Modifier.whiteGlassCard(): Modifier {
                                 DarkGlassBorder.copy(alpha = 0.6f)
                             )
                         ),
-                        shape = RoundedCornerShape(20.dp)
+                        shape = RoundedCornerShape(24.dp)
                     )
             }
         )

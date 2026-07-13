@@ -3,7 +3,6 @@ package com.yishell.app.presentation.monitor
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.trilead.ssh2.Connection
 import com.yishell.app.data.model.MonitorItem
 import com.yishell.app.data.model.ProcessInfo
 import com.yishell.app.data.remote.SshManager
@@ -72,6 +71,11 @@ class MonitorViewModel @Inject constructor(
         }
     }
 
+    companion object {
+        private const val CPU_STAT_CMD = "awk '/^cpu /{print \$2,\$3,\$4,\$5,\$6,\$7,\$8,\$9; exit}' /proc/stat; echo '---SLEEP---'; sleep 0.2; awk '/^cpu /{print \$2,\$3,\$4,\$5,\$6,\$7,\$8,\$9; exit}' /proc/stat; echo '---CORES---'; grep -c '^cpu[0-9]' /proc/stat"
+        private const val NET_SAMPLE_CMD = "awk 'NR>2 && \$1!~/lo/{r+=\$2; t+=\$10} END{print r, t}' /proc/net/dev; echo '---SLEEP---'; sleep 0.2; awk 'NR>2 && \$1!~/lo/{r+=\$2; t+=\$10} END{print r, t}' /proc/net/dev"
+    }
+
     private fun loadConnectionInfo() {
         viewModelScope.launch {
             val config = withContext(Dispatchers.IO) {
@@ -101,35 +105,34 @@ class MonitorViewModel @Inject constructor(
     }
 
     /**
-     * 监控数据采集 —— 每个命令独立 SSH session 并发执行。
+     * 监控数据采集 —— 所有命令通过 SshManager.executeSingleCommand 执行。
      *
      * 关键修复点：
      * 1. CPU：读 /proc/stat 两次（间隔 200ms）算差值 —— 真正瞬时值，不依赖 top 实现
      * 2. 进程：用 top -bn1 的进程段（瞬时 %CPU），不用 ps aux（累计平均，多核会 >100% 误导用户）
      * 3. 网络：读 /proc/net/dev 两次算差值 —— 真实上下行速率
+     * 4. 不再直接操作 Connection 对象，统一经 SshManager 执行（含超时保护）
      */
     private suspend fun fetchMonitorData() {
-        val connection = withContext(Dispatchers.IO) {
-            sshManager.getConnection(connectionId)
-        } ?: run {
+        if (!sshManager.isConnectionActive(connectionId)) {
             _error.value = "SSH 连接不可用"
             return
         }
 
-        val results = withTimeoutOrNull(10_000L) {
+        val results = withTimeoutOrNull(15_000L) {
             withContext(Dispatchers.IO) {
                 listOf(
-                    async { "cpuStat" to executeCpuStatSample(connection) },     // 两次采样
-                    async { "mem" to executeCommand(connection, "cat /proc/meminfo 2>/dev/null | head -5") },
-                    async { "disk" to executeCommand(connection, "df -B1 / 2>/dev/null | tail -1 || df / 2>/dev/null | tail -1") },
-                    async { "uptime" to executeCommand(connection, "uptime -p 2>/dev/null || uptime 2>/dev/null || cat /proc/uptime") },
-                    async { "hostname" to executeCommand(connection, "hostname 2>/dev/null || cat /etc/hostname") },
-                    async { "top" to executeCommand(connection, "top -bn1 2>/dev/null | head -20 || top -n1 2>/dev/null | head -20 || top -b 2>/dev/null | head -20") },
-                    async { "net" to executeNetSample(connection) }                // 两次采样
+                    async { "cpuStat" to (sshManager.executeSingleCommand(connectionId, CPU_STAT_CMD, 8_000L) ?: "") },
+                    async { "mem" to (sshManager.executeSingleCommand(connectionId, "cat /proc/meminfo 2>/dev/null | head -5") ?: "") },
+                    async { "disk" to (sshManager.executeSingleCommand(connectionId, "df -B1 / 2>/dev/null | tail -1 || df / 2>/dev/null | tail -1") ?: "") },
+                    async { "uptime" to (sshManager.executeSingleCommand(connectionId, "uptime -p 2>/dev/null || uptime 2>/dev/null || cat /proc/uptime") ?: "") },
+                    async { "hostname" to (sshManager.executeSingleCommand(connectionId, "hostname 2>/dev/null || cat /etc/hostname") ?: "") },
+                    async { "top" to (sshManager.executeSingleCommand(connectionId, "top -bn1 2>/dev/null | head -20 || top -n1 2>/dev/null | head -20 || top -b 2>/dev/null | head -20", 8_000L) ?: "") },
+                    async { "net" to (sshManager.executeSingleCommand(connectionId, NET_SAMPLE_CMD, 8_000L) ?: "") }
                 ).awaitAll().toMap()
             }
         } ?: run {
-            _error.value = "监控命令超时 (10s)，服务器响应过慢"
+            _error.value = "监控命令超时 (15s)，服务器响应过慢"
             return
         }
 
@@ -182,67 +185,6 @@ class MonitorViewModel @Inject constructor(
     }
 
     /**
-     * CPU 采样：连读两次 /proc/stat，中间 sleep 200ms，返回两次原文以便算差值。
-     * 用 marker 包围，避免和别的输出混在一起。
-     */
-    private fun executeCpuStatSample(connection: Connection): String {
-        val session = connection.openSession()
-        return try {
-            // awk 取 cpu 总行的 8 个累计 jiffies，第一次输出 + sleep 200ms + 第二次输出
-            // 用唯一 marker 分隔
-            val cmd = "awk '/^cpu /{print \$2,\$3,\$4,\$5,\$6,\$7,\$8,\$9; exit}' /proc/stat; echo '---SLEEP---'; sleep 0.2; awk '/^cpu /{print \$2,\$3,\$4,\$5,\$6,\$7,\$8,\$9; exit}' /proc/stat; echo '---CORES---'; grep -c '^cpu[0-9]' /proc/stat"
-            session.execCommand(cmd)
-            val stdout = session.getStdout()
-            val buffer = ByteArray(8192)
-            val result = StringBuilder()
-            val endTime = System.currentTimeMillis() + 3000
-            while (System.currentTimeMillis() < endTime) {
-                val n = stdout.read(buffer)
-                if (n > 0) {
-                    result.append(String(buffer, 0, n))
-                } else if (n == -1) {
-                    break
-                } else {
-                    try { Thread.sleep(20) } catch (_: InterruptedException) { break }
-                }
-            }
-            result.toString().trim()
-        } finally {
-            try { session.close() } catch (_: Exception) {}
-        }
-    }
-
-    /**
-     * 网络采样：读 /proc/net/dev 两次，中间 sleep 200ms，返回两次的聚合字节数。
-     */
-    private fun executeNetSample(connection: Connection): String {
-        val session = connection.openSession()
-        return try {
-            // 聚合所有非 lo 接口的 RX bytes（第2字段）和 TX bytes（第10字段）
-            // 输出格式："rx1 tx1 ---SLEEP--- rx2 tx2"
-            val cmd = "awk 'NR>2 && \$1!~/lo/{r+=\$2; t+=\$10} END{print r, t}' /proc/net/dev; echo '---SLEEP---'; sleep 0.2; awk 'NR>2 && \$1!~/lo/{r+=\$2; t+=\$10} END{print r, t}' /proc/net/dev"
-            session.execCommand(cmd)
-            val stdout = session.getStdout()
-            val buffer = ByteArray(8192)
-            val result = StringBuilder()
-            val endTime = System.currentTimeMillis() + 3000
-            while (System.currentTimeMillis() < endTime) {
-                val n = stdout.read(buffer)
-                if (n > 0) {
-                    result.append(String(buffer, 0, n))
-                } else if (n == -1) {
-                    break
-                } else {
-                    try { Thread.sleep(20) } catch (_: InterruptedException) { break }
-                }
-            }
-            result.toString().trim()
-        } finally {
-            try { session.close() } catch (_: Exception) {}
-        }
-    }
-
-    /**
      * 从 /proc/stat 两次采样算 CPU 瞬时占用率。
      * /proc/stat cpu 行：user nice system idle iowait irq softirq steal（单位 jiffies，通常 10ms）
      * CPU 总时间 = 所有字段之和；空闲 = idle + iowait；占用率 = 1 - idle/total
@@ -267,30 +209,6 @@ class MonitorViewModel @Inject constructor(
         val idleDelta = idle2 - idle1
         if (totalDelta <= 0) return 0f
         return ((totalDelta - idleDelta).toFloat() / totalDelta * 100f).coerceIn(0f, 100f)
-    }
-
-    private fun executeCommand(connection: Connection, command: String): String {
-        val session = connection.openSession()
-        return try {
-            session.execCommand(command)
-            val stdout = session.getStdout()
-            val buffer = ByteArray(8192)
-            val result = StringBuilder()
-            val endTime = System.currentTimeMillis() + 5000
-            while (System.currentTimeMillis() < endTime) {
-                val n = stdout.read(buffer)
-                if (n > 0) {
-                    result.append(String(buffer, 0, n))
-                } else if (n == -1) {
-                    break
-                } else {
-                    try { Thread.sleep(20) } catch (_: InterruptedException) { break }
-                }
-            }
-            result.toString().trim()
-        } finally {
-            try { session.close() } catch (_: Exception) {}
-        }
     }
 
     private fun parseLoadAvg(topOutput: String): FloatArray {
@@ -468,17 +386,8 @@ class MonitorViewModel @Inject constructor(
         viewModelScope.launch(exceptionHandler) {
             withContext(Dispatchers.IO) {
                 try {
-                    val connection = sshManager.getConnection(connectionId)
-                    if (connection != null) {
-                        val session = connection.openSession()
-                        try {
-                            val signal = if (force) "kill -9" else "kill"
-                            session.execCommand("$signal $pid")
-                            Thread.sleep(300)
-                        } finally {
-                            try { session.close() } catch (_: Exception) {}
-                        }
-                    }
+                    val signal = if (force) "kill -9" else "kill"
+                    sshManager.executeSingleCommand(connectionId, "$signal $pid", 3_000L)
                 } catch (e: Exception) {
                     _error.value = "Kill failed: ${e.message}"
                 }

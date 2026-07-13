@@ -44,6 +44,7 @@ fun SettingsScreen(
     onNavigateToAppearance: () -> Unit,
     onNavigateToTerminal: () -> Unit,
     onNavigateToConnection: () -> Unit,
+    onNavigateToDataManagement: () -> Unit,
     onNavigateToAbout: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -70,20 +71,26 @@ fun SettingsScreen(
             SettingsCategoryCard(
                 icon = Icons.Default.Palette,
                 title = "外观",
-                description = "主题、玻璃效果、字体大小",
+                description = "主题、玻璃效果、图标动效",
                 onClick = onNavigateToAppearance
             )
             SettingsCategoryCard(
                 icon = Icons.Default.Terminal,
                 title = "终端",
-                description = "键盘布局、终端配色",
+                description = "字体大小、键盘布局、终端配色",
                 onClick = onNavigateToTerminal
             )
             SettingsCategoryCard(
                 icon = Icons.Default.Link,
                 title = "连接",
-                description = "SSH超时、自动重连、保活间隔",
+                description = "SSH超时、自动重连、保活间隔、默认端口",
                 onClick = onNavigateToConnection
+            )
+            SettingsCategoryCard(
+                icon = Icons.Default.Refresh,
+                title = "数据管理",
+                description = "备份、恢复",
+                onClick = onNavigateToDataManagement
             )
             SettingsCategoryCard(
                 icon = Icons.Default.Info,

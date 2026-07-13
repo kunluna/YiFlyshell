@@ -9,7 +9,7 @@ import com.yishell.app.data.model.Session
 
 @Database(
     entities = [ConnectionConfig::class, Session::class, PortForwarding::class, QuickCommand::class],
-    version = 5,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -20,6 +20,18 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
             override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE connections ADD COLUMN customIconUri TEXT")
+            }
+        }
+
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE connections ADD COLUMN favoriteOrder INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE connections ADD COLUMN iconResName TEXT")
             }
         }
     }

@@ -164,9 +164,52 @@ class TerminalViewModel @Inject constructor(
                     _quickCommands.value = it
                 }
             }
-            connect()
+            // 检查连接是否已存在且活跃：如果是，复用连接、恢复历史输出，不重连
+            if (sshManager.isConnectionActive(connectionId)) {
+                Log.d(TAG, "Connection $connectionId already active, resuming session")
+                resumeSession()
+            } else {
+                connect()
+            }
         } else {
             _connectionState.value = ConnectionState.Error("无效的连接 ID")
+        }
+    }
+
+    /**
+     * 复用已有连接恢复会话：拉取历史输出、直接进入 Connected 状态、启动输出读取。
+     */
+    private fun resumeSession() {
+        viewModelScope.launch(exceptionHandler) {
+            // 恢复连接名称
+            val config = withContext(Dispatchers.IO) {
+                try { connectionRepository.getConnectionById(connectionId) } catch (_: Exception) { null }
+            }
+            _connectionName.value = config?.name ?: ""
+
+            // 拉取缓冲的历史输出
+            val buffered = withContext(Dispatchers.IO) {
+                sshManager.getBufferedOutput(connectionId)
+            }
+            if (buffered.isNotEmpty()) {
+                _terminalOutput.value = terminalEmulator.process(buffered)
+            }
+
+            // 直接进入 Connected 状态
+            _connectionState.value = ConnectionState.Connected
+            connectionStartTime = System.currentTimeMillis()
+            startStatsTimer()
+            appendOutput("\n[已恢复会话]\n")
+
+            // 启动日志记录
+            currentSessionId = try {
+                connectionRepository.startSession(connectionId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start session: ${e.message}", e)
+                null
+            }
+            terminalLogger.startSession(currentSessionId ?: UUID.randomUUID().toString())
+            startOutputReader()
         }
     }
 
@@ -471,23 +514,6 @@ class TerminalViewModel @Inject constructor(
             clipboard.setPrimaryClip(clip)
             _copyFeedback.value = "已复制 ${annotatedText.text.length} 字符"
         }
-    }
-
-    /**
-     * 双光标选择模式：复制终端输出中 [start, end) 区间的纯文本。
-     * 单层解析后，AnnotatedString 直接包含纯文本，无需再剥离 ANSI。
-     */
-    fun copySelectedText(start: Int, end: Int) {
-        val annotatedText = _terminalOutput.value
-        if (annotatedText.text.isBlank()) return
-        val s = start.coerceIn(0, annotatedText.text.length)
-        val e = end.coerceIn(0, annotatedText.text.length)
-        if (s >= e) return
-        val selected = annotatedText.text.substring(s, e)
-        val clipboard = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("terminal_selection", selected)
-        clipboard.setPrimaryClip(clip)
-        _copyFeedback.value = "已复制 ${selected.length} 字符"
     }
 
     /**
@@ -828,15 +854,8 @@ class TerminalViewModel @Inject constructor(
             }
             currentSessionId = null
         }
-        viewModelScope.launch(exceptionHandler) {
-            withContext(Dispatchers.IO) {
-                try {
-                    sshManager.disconnect(connectionId)
-                } catch (e: Exception) {
-                    Log.e(TAG, "onCleared disconnect failed: ${e.message}", e)
-                }
-            }
-        }
+        // 不在 onCleared 中断开连接：用户返回首页时连接应保持存活，
+        // 再次进入终端时可以恢复会话。连接由用户主动断开或 HomeViewModel.disconnect() 管理。
         super.onCleared()
     }
 }

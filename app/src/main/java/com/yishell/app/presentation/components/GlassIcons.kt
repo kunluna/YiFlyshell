@@ -3,6 +3,7 @@ package com.yishell.app.presentation.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -54,6 +55,7 @@ fun GlassServerIcon(
     showPlus: Boolean = false,
     useTerminal: Boolean = false,
     customIconUri: String? = null,
+    iconResName: String? = null,
     size: Int = 80
 ) {
     // 自定义图标优先
@@ -65,6 +67,21 @@ fun GlassServerIcon(
             modifier = modifier.size(size.dp)
         )
         return
+    }
+    // 用户在编辑页选了具体预设图标时，按资源名直接加载
+    if (iconResName != null) {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val resId = remember(iconResName) {
+            context.resources.getIdentifier(iconResName, "drawable", context.packageName)
+        }
+        if (resId != 0) {
+            androidx.compose.foundation.Image(
+                painter = painterResource(resId),
+                contentDescription = contentDescription,
+                modifier = modifier.size(size.dp)
+            )
+            return
+        }
     }
     val resId = when {
         showPlus -> R.drawable.ic_server_action
@@ -95,54 +112,6 @@ fun GlassServerIcon(
     }
     androidx.compose.foundation.Image(
         painter = painterResource(resId),
-        contentDescription = contentDescription,
-        modifier = modifier.size(size.dp)
-    )
-}
-
-/** 小 Server 图标 — PNG 资源 */
-@Composable
-fun GlassSmallServerIcon(
-    modifier: Modifier = Modifier,
-    contentDescription: String? = null,
-    color: ConnectionColor = ConnectionColor.DEFAULT,
-    showStar: Boolean = false,
-    size: Int = 48
-) {
-    val resId = when {
-        showStar -> when (color) {
-            ConnectionColor.DEFAULT, ConnectionColor.BLUE -> R.drawable.ic_server_fav_blue
-            ConnectionColor.GREEN -> R.drawable.ic_server_fav_green
-            ConnectionColor.YELLOW -> R.drawable.ic_server_fav_yellow
-            ConnectionColor.PURPLE -> R.drawable.ic_server_fav_purple
-            ConnectionColor.CYAN -> R.drawable.ic_server_fav_cyan
-            ConnectionColor.RED -> R.drawable.ic_server_fav_red
-        }
-        else -> when (color) {
-            ConnectionColor.DEFAULT, ConnectionColor.BLUE -> R.drawable.ic_server_small_blue
-            ConnectionColor.GREEN -> R.drawable.ic_server_small_green
-            ConnectionColor.YELLOW -> R.drawable.ic_server_small_yellow
-            ConnectionColor.PURPLE -> R.drawable.ic_server_small_purple
-            ConnectionColor.CYAN -> R.drawable.ic_server_small_cyan
-            ConnectionColor.RED -> R.drawable.ic_server_small_red
-        }
-    }
-    androidx.compose.foundation.Image(
-        painter = painterResource(resId),
-        contentDescription = contentDescription,
-        modifier = modifier.size(size.dp)
-    )
-}
-
-/** ActionCard 大立方体 — PNG 资源 */
-@Composable
-fun GlassActionCubeIcon(
-    modifier: Modifier = Modifier,
-    contentDescription: String? = null,
-    size: Int = 96
-) {
-    androidx.compose.foundation.Image(
-        painter = painterResource(R.drawable.ic_server_action),
         contentDescription = contentDescription,
         modifier = modifier.size(size.dp)
     )

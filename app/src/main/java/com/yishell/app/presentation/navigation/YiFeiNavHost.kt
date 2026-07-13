@@ -136,6 +136,9 @@ fun YiFeiNavHost(
                     },
                     onNavigateToAbout = {
                         navController.navigate(Screen.About.route)
+                    },
+                    onNavigateToDataManagement = {
+                        navController.navigate(Screen.SettingsDataManagement.route)
                     }
                 )
             }

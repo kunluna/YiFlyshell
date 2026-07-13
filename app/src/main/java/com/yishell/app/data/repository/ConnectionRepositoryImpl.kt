@@ -58,6 +58,9 @@ class ConnectionRepositoryImpl @Inject constructor(
     override suspend fun updateLastConnected(id: String, timestamp: Long) =
         connectionDao.updateLastConnected(id, timestamp)
 
+    override suspend fun updateFavoriteOrder(id: String, order: Int) =
+        connectionDao.updateFavoriteOrder(id, order)
+
     override suspend fun duplicateConnection(id: String, newName: String): String? {
         val original = tempConnections[id]?.config ?: connectionDao.getConnectionById(id) ?: return null
         val newId = java.util.UUID.randomUUID().toString()

@@ -3,6 +3,7 @@ package com.yishell.app.presentation.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yishell.app.data.local.AppSettings
+import com.yishell.app.data.local.IconBreathMode
 import com.yishell.app.data.local.SettingsDataStore
 import com.yishell.app.data.local.TerminalColorScheme
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -68,5 +69,13 @@ class SettingsViewModel @Inject constructor(
 
     fun updateKeepAliveInterval(value: Int) {
         viewModelScope.launch { settingsDataStore.updateKeepAliveInterval(value) }
+    }
+
+    fun updateIconBreathMode(mode: IconBreathMode) {
+        viewModelScope.launch { settingsDataStore.updateIconBreathMode(mode) }
+    }
+
+    fun updateFavoriteDisplayCount(count: Int) {
+        viewModelScope.launch { settingsDataStore.updateFavoriteDisplayCount(count) }
     }
 }

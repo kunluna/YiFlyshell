@@ -3,12 +3,9 @@ package com.yishell.app.presentation.home
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.yishell.app.data.model.AuthType
 import com.yishell.app.data.model.ConnectionConfig
-import com.yishell.app.data.remote.ConnectionExporter
 import com.yishell.app.data.remote.FullBackupManager
 import com.yishell.app.data.remote.SshManager
-import com.yishell.app.data.security.CryptoManager
 import com.yishell.app.domain.repository.ConnectionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,16 +17,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val connectionRepository: ConnectionRepository,
-    private val connectionExporter: ConnectionExporter,
     private val fullBackupManager: FullBackupManager,
-    private val sshManager: SshManager,
-    private val cryptoManager: CryptoManager
+    private val sshManager: SshManager
 ) : ViewModel() {
 
     /**
@@ -55,11 +49,6 @@ class HomeViewModel @Inject constructor(
                 initialValue = emptyList()
             )
 
-    private val _connectionHistory = MutableStateFlow<List<String>>(emptyList())
-    val connectionHistory: StateFlow<List<String>> = _connectionHistory.asStateFlow()
-
-    // P1-6：connectedSessions 从 SshManager SSOT 派生，不再独立维护本地列表。
-    // _clockTick 每秒翻转，触发派生 flow 重新 emit 以刷新"已连接时长"显示。
     private val _clockTick = MutableStateFlow(0L)
 
     val connectedSessions: StateFlow<List<ConnectedSession>> =
@@ -84,8 +73,8 @@ class HomeViewModel @Inject constructor(
                 val active = sshManager.activeConnections.value
                 for (conn in list) {
                     val session = active[conn.id] ?: continue
-                    if (session.color != conn.color || session.customIconUri != conn.customIconUri) {
-                        sshManager.refreshConnectionMetadata(conn.id, conn.color, conn.customIconUri)
+                    if (session.color != conn.color || session.customIconUri != conn.customIconUri || session.iconResName != conn.iconResName) {
+                        sshManager.refreshConnectionMetadata(conn.id, conn.color, conn.iconResName, conn.customIconUri)
                     }
                 }
             }
@@ -144,104 +133,46 @@ class HomeViewModel @Inject constructor(
 
     fun getFavoriteConnections(): List<ConnectionConfig> {
         return connections.value.filter { it.isFavorite }
-            .sortedByDescending { it.lastConnected ?: 0L }
-            .take(10)
+            .sortedBy { it.favoriteOrder }
+            .take(20)
     }
 
-    fun addToHistory(connectionId: String) {
-        val currentHistory = _connectionHistory.value.toMutableList()
-        currentHistory.remove(connectionId)
-        currentHistory.add(0, connectionId)
-        if (currentHistory.size > 10) {
-            currentHistory.removeAt(currentHistory.lastIndex)
-        }
-        _connectionHistory.value = currentHistory
+    fun getAllFavoriteConnections(): List<ConnectionConfig> {
+        return connections.value.filter { it.isFavorite }
+            .sortedBy { it.favoriteOrder }
     }
 
-    private val _isQuickConnectExpanded = MutableStateFlow(false)
-    val isQuickConnectExpanded: StateFlow<Boolean> = _isQuickConnectExpanded.asStateFlow()
-
-    private val _quickHost = MutableStateFlow("")
-    val quickHost: StateFlow<String> = _quickHost.asStateFlow()
-
-    private val _quickPort = MutableStateFlow("22")
-    val quickPort: StateFlow<String> = _quickPort.asStateFlow()
-
-    private val _quickUsername = MutableStateFlow("")
-    val quickUsername: StateFlow<String> = _quickUsername.asStateFlow()
-
-    private val _quickPassword = MutableStateFlow("")
-    val quickPassword: StateFlow<String> = _quickPassword.asStateFlow()
-
-    fun toggleQuickConnect() {
-        _isQuickConnectExpanded.value = !_isQuickConnectExpanded.value
-    }
-
-    fun updateQuickHost(value: String) {
-        _quickHost.value = value
-    }
-
-    fun updateQuickPort(value: String) {
-        // 只允许数字
-        if (value.all { it.isDigit() }) {
-            _quickPort.value = value
+    fun updateFavoriteOrder(connectionId: String, order: Int) {
+        viewModelScope.launch {
+            connectionRepository.updateFavoriteOrder(connectionId, order)
         }
     }
 
-    fun updateQuickUsername(value: String) {
-        _quickUsername.value = value
+    fun swapFavoriteOrder(fromIndex: Int, toIndex: Int) {
+        val favorites = getAllFavoriteConnections()
+        if (fromIndex !in favorites.indices || toIndex !in favorites.indices) return
+        viewModelScope.launch {
+            val from = favorites[fromIndex]
+            val to = favorites[toIndex]
+            connectionRepository.updateFavoriteOrder(from.id, to.favoriteOrder)
+            connectionRepository.updateFavoriteOrder(to.id, from.favoriteOrder)
+        }
     }
 
-    fun updateQuickPassword(value: String) {
-        _quickPassword.value = value
+    fun moveFavorite(fromIndex: Int, toIndex: Int) {
+        val favorites = getAllFavoriteConnections()
+        if (fromIndex !in favorites.indices || toIndex !in favorites.indices) return
+        viewModelScope.launch {
+            val mutable = favorites.toMutableList()
+            val item = mutable.removeAt(fromIndex)
+            mutable.add(toIndex, item)
+            mutable.forEachIndexed { index, config ->
+                if (config.favoriteOrder != index) {
+                    connectionRepository.updateFavoriteOrder(config.id, index)
+                }
+            }
+        }
     }
-
-    fun quickConnect(): String? {
-        val host = _quickHost.value.trim()
-        val port = _quickPort.value.trim().toIntOrNull() ?: 22
-        val username = _quickUsername.value.trim()
-        val password = _quickPassword.value
-
-        // 输入校验
-        if (host.isBlank()) {
-            Log.w(TAG, "Quick connect: host is blank")
-            return null
-        }
-        if (username.isBlank()) {
-            Log.w(TAG, "Quick connect: username is blank")
-            return null
-        }
-        if (port !in 1..65535) {
-            Log.w(TAG, "Quick connect: invalid port $port")
-            return null
-        }
-
-        // 安全修复（P0-3）：快速连接的密码必须加密后再放入 ConnectionConfig，
-        // 否则明文密码会留在内存和 tempConnections map 中，与持久化连接的加密标准不一致。
-        val encryptedPassword = if (password.isBlank()) null else cryptoManager.encrypt(password)
-
-        val config = ConnectionConfig(
-            id = UUID.randomUUID().toString(),
-            name = "$username@$host",
-            host = host,
-            port = port,
-            username = username,
-            authType = AuthType.PASSWORD,
-            password = encryptedPassword
-        )
-
-        try {
-            connectionRepository.saveTempConnection(config)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to save temp connection: ${e.message}", e)
-            return null
-        }
-
-        return config.id
-    }
-
-    private val _exportMessage = MutableStateFlow<String?>(null)
-    val exportMessage: StateFlow<String?> = _exportMessage.asStateFlow()
 
     private val _backupMessage = MutableStateFlow<String?>(null)
     val backupMessage: StateFlow<String?> = _backupMessage.asStateFlow()
@@ -274,41 +205,6 @@ class HomeViewModel @Inject constructor(
                 Log.e(TAG, "Failed to duplicate connection: ${e.message}", e)
             }
         }
-    }
-
-    fun exportConnections() {
-        viewModelScope.launch {
-            try {
-                val allConnections = connections.value
-                val json = connectionExporter.exportToJson(allConnections)
-                val file = connectionExporter.saveToFile(json)
-                _exportMessage.value = if (file != null) {
-                    "已导出到: ${file.absolutePath}"
-                } else {
-                    "导出失败"
-                }
-            } catch (e: Exception) {
-                _exportMessage.value = "导出失败: ${e.message}"
-            }
-        }
-    }
-
-    fun importConnections(json: String) {
-        viewModelScope.launch {
-            try {
-                val imported = connectionExporter.importFromJson(json)
-                imported.forEach { config ->
-                    connectionRepository.insertConnection(config)
-                }
-                _exportMessage.value = "已导入 ${imported.size} 个连接"
-            } catch (e: Exception) {
-                _exportMessage.value = "导入失败: ${e.message}"
-            }
-        }
-    }
-
-    fun clearExportMessage() {
-        _exportMessage.value = null
     }
 
     fun createFullBackup() {

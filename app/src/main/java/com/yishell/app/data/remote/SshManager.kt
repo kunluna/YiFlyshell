@@ -42,6 +42,8 @@ class SshManager @Inject constructor(
         private const val MAX_CONNECTIONS = 10
         // P2-2：keepalive 间隔。多数服务器/防火墙在 5-10 分钟空闲后踢连接，30s 足够保活且开销低。
         private const val KEEPALIVE_INTERVAL_MS = 30_000L
+        // 输出环形缓冲大小：保留最近 64KB 的终端输出
+        private const val OUTPUT_BUFFER_SIZE = 65536
     }
 
     /**
@@ -67,7 +69,9 @@ class SshManager @Inject constructor(
         val name: String,
         val username: String,
         val host: String,
+        val port: Int = 22,
         val color: ConnectionColor,
+        val iconResName: String? = null,
         val customIconUri: String? = null,
         val connectedAt: Long
     )
@@ -81,7 +85,10 @@ class SshManager @Inject constructor(
         var stdout: InputStream? = null,
         var bufferedStdout: BufferedInputStream? = null,
         val activeForwarders: MutableMap<String, LocalPortForwarder> = mutableMapOf(),
-        val remoteForwardPorts: MutableMap<String, Int> = mutableMapOf()
+        val remoteForwardPorts: MutableMap<String, Int> = mutableMapOf(),
+        // 输出环形缓冲：保存最近的终端输出，TerminalViewModel 恢复时可以拉取历史
+        val outputBuffer: StringBuilder = StringBuilder(OUTPUT_BUFFER_SIZE),
+        var outputBufferOverflow: Boolean = false
     )
 
     private val managedConnections = mutableMapOf<String, ManagedConnection>()
@@ -100,6 +107,15 @@ class SshManager @Inject constructor(
         acceptedFingerprint: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
         val connectionId = config.id
+
+        // 复用已有连接：如果连接已存在且 alive，直接返回 true，不重连
+        synchronized(lock) {
+            val existing = managedConnections[connectionId]
+            if (existing != null && existing.alive && existing.session != null) {
+                Log.d(TAG, "Connection $connectionId already active, reusing")
+                return@withContext true
+            }
+        }
 
         // P1-3 锁粒度收窄：临界区 1 仅做 map 操作（检查上限 + 取出并断开已有连接），
         // 网络连接 / 认证 / openSession 等慢 IO 全部移出锁外，避免 5s 超时期间阻塞其他连接操作。
@@ -208,7 +224,9 @@ class SshManager @Inject constructor(
                     name = config.name,
                     username = config.username,
                     host = config.host,
+                    port = config.port,
                     color = config.color,
+                    iconResName = config.iconResName,
                     customIconUri = config.customIconUri,
                     connectedAt = System.currentTimeMillis()
                 ))
@@ -247,16 +265,36 @@ class SshManager @Inject constructor(
 
     /**
      * 在已建立的连接上执行单条命令并返回输出（非交互式 exec channel）。
-     * 用于连接成功后获取 hostname 等轻量信息，不影响主 shell 会话。
+     * 用于连接成功后获取 hostname、监控数据采集等轻量操作，不影响主 shell 会话。
+     *
+     * @param timeoutMs 命令执行超时时间，超时后强制关闭 session。默认 5000ms。
+     *                  防止网络异常或服务器无响应时 session 泄漏。
      */
-    suspend fun executeSingleCommand(connectionId: String, command: String): String? = withContext(Dispatchers.IO) {
+    suspend fun executeSingleCommand(
+        connectionId: String,
+        command: String,
+        timeoutMs: Long = 5_000L
+    ): String? = withContext(Dispatchers.IO) {
         val managed = synchronized(lock) { managedConnections[connectionId] } ?: return@withContext null
         var execSession: Session? = null
         try {
             execSession = managed.connection.openSession()
             execSession.execCommand(command)
-            val output = execSession.getStdout()?.bufferedReader()?.use { it.readText() }
-            output?.trim()
+            val stdout = execSession.getStdout() ?: return@withContext null
+            val buffer = ByteArray(8192)
+            val result = StringBuilder()
+            val endTime = System.currentTimeMillis() + timeoutMs
+            while (System.currentTimeMillis() < endTime) {
+                val n = stdout.read(buffer)
+                if (n > 0) {
+                    result.append(String(buffer, 0, n))
+                } else if (n == -1) {
+                    break
+                } else {
+                    Thread.sleep(20)
+                }
+            }
+            result.toString().trim().ifEmpty { null }
         } catch (e: Exception) {
             Log.e(TAG, "executeSingleCommand failed: ${e.message}", e)
             null
@@ -276,14 +314,14 @@ class SshManager @Inject constructor(
     }
 
     /**
-     * 从数据库重新加载连接的 color 和 customIconUri 并更新 SSOT。
+     * 从数据库重新加载连接的图标信息并更新 SSOT。
      * 用于编辑连接后刷新已连接卡片的图标显示。
      */
-    fun refreshConnectionMetadata(connectionId: String, color: ConnectionColor, customIconUri: String?) {
+    fun refreshConnectionMetadata(connectionId: String, color: ConnectionColor, iconResName: String?, customIconUri: String?) {
         synchronized(lock) {
             val current = _activeConnections.value[connectionId] ?: return
             _activeConnections.value = _activeConnections.value + (
-                connectionId to current.copy(color = color, customIconUri = customIconUri)
+                connectionId to current.copy(color = color, iconResName = iconResName, customIconUri = customIconUri)
             )
         }
     }
@@ -304,10 +342,46 @@ class SshManager @Inject constructor(
     fun readOutput(connectionId: String): String {
         val managed = synchronized(lock) { managedConnections[connectionId] } ?: return ""
         return try {
-            readAvailableOutputInternal(managed)
+            val output = readAvailableOutputInternal(managed)
+            // 将输出追加到环形缓冲
+            if (output.isNotEmpty()) {
+                appendToOutputBuffer(managed, output)
+            }
+            output
         } catch (e: Exception) {
             Log.w(TAG, "readOutput failed: ${e.message}")
             ""
+        }
+    }
+
+    /**
+     * 获取连接的缓冲输出历史。TerminalViewModel 恢复时调一次，拿到之前的终端输出。
+     */
+    fun getBufferedOutput(connectionId: String): String {
+        val managed = synchronized(lock) { managedConnections[connectionId] } ?: return ""
+        return synchronized(managed.outputBuffer) {
+            managed.outputBuffer.toString()
+        }
+    }
+
+    /**
+     * 检查连接是否已存在且活跃（不触发新连接）。
+     */
+    fun isConnectionActive(connectionId: String): Boolean {
+        val managed = synchronized(lock) { managedConnections[connectionId] }
+        return managed != null && managed.alive && managed.session != null
+    }
+
+    private fun appendToOutputBuffer(managed: ManagedConnection, output: String) {
+        synchronized(managed.outputBuffer) {
+            val buf = managed.outputBuffer
+            buf.append(output)
+            // 环形缓冲：超过最大容量时截断前面部分
+            if (buf.length > OUTPUT_BUFFER_SIZE) {
+                val excess = buf.length - OUTPUT_BUFFER_SIZE
+                buf.delete(0, excess)
+                managed.outputBufferOverflow = true
+            }
         }
     }
 

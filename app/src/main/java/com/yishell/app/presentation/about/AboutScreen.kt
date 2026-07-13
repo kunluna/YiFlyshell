@@ -1,6 +1,7 @@
 package com.yishell.app.presentation.about
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -95,6 +96,30 @@ fun AboutScreen(
                 fontSize = 14.sp,
                 color = Color.Gray,
                 lineHeight = 22.sp
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            Text(
+                text = "GitHub",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = PrimaryBlue,
+                modifier = Modifier.clickable {
+                    // TODO: 打开 GitHub 仓库链接
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "反馈与建议",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = PrimaryBlue,
+                modifier = Modifier.clickable {
+                    // TODO: 打开反馈渠道
+                }
             )
         }
     }

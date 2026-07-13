@@ -63,6 +63,9 @@ class AddConnectionViewModel @Inject constructor(
     private val _customIconUri = MutableStateFlow<String?>(null)
     val customIconUri: StateFlow<String?> = _customIconUri.asStateFlow()
 
+    private val _iconResName = MutableStateFlow<String?>(null)
+    val iconResName: StateFlow<String?> = _iconResName.asStateFlow()
+
     private val _errors = MutableStateFlow<Map<String, String>>(emptyMap())
     val errors: StateFlow<Map<String, String>> = _errors.asStateFlow()
 
@@ -101,6 +104,7 @@ class AddConnectionViewModel @Inject constructor(
                     _isFavorite.value = config.isFavorite
                     _color.value = config.color
                     _customIconUri.value = config.customIconUri
+                    _iconResName.value = config.iconResName
                 }
             }
         }
@@ -118,6 +122,7 @@ class AddConnectionViewModel @Inject constructor(
     fun updateIsFavorite(value: Boolean) { _isFavorite.value = value }
     fun updateColor(value: com.yishell.app.data.model.ConnectionColor) { _color.value = value }
     fun updateCustomIconUri(value: String?) { _customIconUri.value = value }
+    fun updateIconResName(value: String?) { _iconResName.value = value }
 
     fun save() {
         val validationErrors = validate()
@@ -146,6 +151,7 @@ class AddConnectionViewModel @Inject constructor(
             passphrase = encryptedPassphrase,
             group = _group.value.trim(),
             color = _color.value,
+            iconResName = _iconResName.value,
             customIconUri = _customIconUri.value,
             isFavorite = _isFavorite.value
         )

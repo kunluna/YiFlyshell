@@ -1,13 +1,21 @@
 package com.yishell.app.presentation.home
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lan
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -16,6 +24,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -213,22 +224,22 @@ private fun ConnectedSection(
     GlassCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp) // 规范 5.2
+            .padding(horizontal = 16.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp) // 规范 5.5 Card 内边距 16dp
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(StatusGreen)
+                Icon(
+                    imageVector = Icons.Filled.Lan,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = StatusGreen
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -249,12 +260,12 @@ private fun ConnectedSection(
             }
 
             if (sessions.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 sessions.forEachIndexed { index, session ->
                     if (index > 0) {
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         DashedDivider()
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
                     ConnectedCard(
                         session = session,
@@ -297,53 +308,39 @@ private fun ConnectedCard(
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        GlassServerIcon(
-            modifier = Modifier.size(48.dp),
-            color = session.info.color,
-            customIconUri = session.info.customIconUri,
-            size = 48
-        )
-        Spacer(modifier = Modifier.width(12.dp)) // 规范 5.6 图标与文字 12dp
+        Box(modifier = Modifier.size(48.dp)) {
+            GlassServerIcon(
+                modifier = Modifier.fillMaxSize(),
+                color = session.info.color,
+                customIconUri = session.info.customIconUri,
+                iconResName = session.info.iconResName,
+                size = 48
+            )
+            FlowLightLine(
+                color = breathGlowColor(session.info.color),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 4.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = session.info.name,
-                fontSize = 18.sp, // 规范 4.4 Title 18sp
-                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
                 color = TextPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(1.dp))
             Text(
-                text = "${session.info.username}@${session.info.host}",
-                fontSize = 13.sp, // 规范 4.4 Caption 13sp
+                text = "${session.info.username}@${session.info.host}:${session.info.port}",
+                fontSize = 12.sp,
                 color = TextTertiary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(StatusGreen)
-                )
-                Spacer(modifier = Modifier.width(5.dp))
-                Text(
-                    text = "已连接",
-                    fontSize = 12.sp,
-                    color = StatusGreen
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = getDurationString(session.connectedAt),
-                    fontSize = 12.sp,
-                    color = TextTertiary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
         }
         Spacer(modifier = Modifier.width(10.dp))
         Box(
@@ -416,12 +413,12 @@ private fun RecentSection(
     GlassCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp) // 规范 5.2
+            .padding(horizontal = 16.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -457,7 +454,7 @@ private fun RecentSection(
             }
 
             if (recentList.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 recentList.forEachIndexed { index, config ->
                     if (index > 0) {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -503,6 +500,7 @@ private fun RecentItem(
             modifier = Modifier.size(48.dp),
             color = config.color,
             useTerminal = true,
+            iconResName = config.iconResName,
             size = 48
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -548,12 +546,12 @@ private fun FavoriteSection(
     GlassCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp) // 规范 5.2
+            .padding(horizontal = 16.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -589,7 +587,7 @@ private fun FavoriteSection(
             }
 
             if (favoriteList.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 favoriteList.forEachIndexed { index, config ->
                     if (index > 0) {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -643,6 +641,7 @@ private fun FavoriteItem(
             modifier = Modifier.size(48.dp),
             color = config.color,
             useTerminal = true,
+            iconResName = config.iconResName,
             size = 48
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -860,6 +859,96 @@ private fun formatRelativeTime(timestamp: Long?): String {
         tsCal.get(java.util.Calendar.HOUR_OF_DAY),
         tsCal.get(java.util.Calendar.MINUTE)
     )
+}
+
+/**
+ * 流光细线：图标底部一条细线，光点边流动边呼吸（亮度+大小周期变化）
+ */
+@Composable
+private fun FlowLightLine(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    val transition = rememberInfiniteTransition(label = "flowLight")
+    // 光点位置：0→1 循环
+    val progress by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "flowProgress"
+    )
+    // 呼吸：0.2→1→0.2 循环
+    val breath by transition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "breath"
+    )
+
+    Canvas(modifier = modifier
+        .fillMaxWidth()
+        .height(6.dp) // 给光点变大留空间
+    ) {
+        val w = this.size.width
+        val h = this.size.height
+        val centerY = h / 2f
+
+        // 底线——极淡，固定粗细
+        val lineStrokeWidth = h * 0.2f // 约 1.2dp
+        drawLine(
+            color = color.copy(alpha = 0.12f),
+            start = Offset(0f, centerY),
+            end = Offset(w, centerY),
+            strokeWidth = lineStrokeWidth
+        )
+
+        // 流光点——亮度和大小随 breath 变化
+        val lightCenter = progress * w
+        val baseHalfWidth = w * 0.12f
+        val lightHalfWidth = baseHalfWidth * (0.5f + 0.5f * breath) // 宽度呼吸 0.5x~1.0x
+        val peakAlpha = 0.4f + 0.6f * breath // 亮度呼吸 0.4~1.0
+
+        // 光点横向渐变带
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(
+                    color.copy(alpha = 0f),
+                    color.copy(alpha = peakAlpha * 0.6f),
+                    color.copy(alpha = 0f)
+                ),
+                startX = (lightCenter - lightHalfWidth).coerceAtLeast(0f),
+                endX = (lightCenter + lightHalfWidth).coerceAtMost(w)
+            ),
+            topLeft = Offset(0f, 0f),
+            size = Size(w, h)
+        )
+
+        // 光点中心——圆形亮点，呼吸时变大变亮
+        val dotRadius = (h * 0.25f) * (0.5f + 0.5f * breath) // 半径呼吸
+        if (lightCenter > 0f && lightCenter < w) {
+            drawCircle(
+                color = color.copy(alpha = peakAlpha),
+                radius = dotRadius,
+                center = Offset(lightCenter, centerY)
+            )
+        }
+    }
+}
+
+/** 连接颜色对应的光晕色 */
+private fun breathGlowColor(color: ConnectionColor): Color = when (color) {
+    ConnectionColor.DEFAULT, ConnectionColor.BLUE -> Color(0xFF4D8DFF)
+    ConnectionColor.GREEN -> Color(0xFF34D399)
+    ConnectionColor.RED -> Color(0xFFEF4444)
+    ConnectionColor.YELLOW -> Color(0xFFFFCC00)
+    ConnectionColor.PURPLE -> Color(0xFFA855F7)
+    ConnectionColor.CYAN -> Color(0xFFFB923C)
 }
 
 private fun getDurationString(connectedAt: Long): String {

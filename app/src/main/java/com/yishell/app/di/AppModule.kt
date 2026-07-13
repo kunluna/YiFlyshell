@@ -26,7 +26,7 @@ object AppModule {
             AppDatabase::class.java,
             "yishell.db"
         )
-            .addMigrations(AppDatabase.MIGRATION_4_5)
+            .addMigrations(AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7)
             .setQueryExecutor(Executors.newFixedThreadPool(4))
             .build()
     }

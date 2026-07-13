@@ -59,6 +59,7 @@ fun AddConnectionScreen(
     val isFavorite by viewModel.isFavorite.collectAsState()
     val selectedColor by viewModel.color.collectAsState()
     val customIconUri by viewModel.customIconUri.collectAsState()
+    val currentIconResName by viewModel.iconResName.collectAsState()
     val errors by viewModel.errors.collectAsState()
     val isEditing by viewModel.isEditing.collectAsState()
     val saveSuccess by viewModel.saveSuccess.collectAsState()
@@ -327,7 +328,7 @@ fun AddConnectionScreen(
                                 val resId = remember(drawableName) {
                                     context.resources.getIdentifier(drawableName, "drawable", context.packageName)
                                 }
-                                val isSelected = customIconUri == null && selectedColor == color
+                                val isSelected = customIconUri == null && currentIconResName == drawableName
                                 Box(
                                     modifier = Modifier
                                         .size(48.dp)
@@ -339,6 +340,7 @@ fun AddConnectionScreen(
                                         .background(Color.White)
                                         .clickable {
                                             viewModel.updateColor(color)
+                                            viewModel.updateIconResName(drawableName)
                                             viewModel.updateCustomIconUri(null)
                                         },
                                     contentAlignment = Alignment.Center

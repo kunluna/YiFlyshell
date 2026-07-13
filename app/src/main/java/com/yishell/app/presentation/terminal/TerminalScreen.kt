@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
 import org.json.JSONArray
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,10 +79,13 @@ fun TerminalScreen(
     viewModel: TerminalViewModel = hiltViewModel()
 ) {
     var inputText by remember { mutableStateOf("") }
-    var showQuickCommandsBar by remember { mutableStateOf(false) }
-    var showKeyboard by remember { mutableStateOf(false) }
-    var showKeyboardFab by remember { mutableStateOf(true) }
+    var showQuickCommandsBar by rememberSaveable { mutableStateOf(false) }
+    var showKeyboard by rememberSaveable { mutableStateOf(false) }
+    var showKeyboardFab by rememberSaveable { mutableStateOf(true) }
     var showExitDialog by remember { mutableStateOf(false) }
+    BackHandler {
+        showExitDialog = true
+    }
     val terminalOutput by viewModel.terminalOutput.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
     val keyboardLayout by viewModel.keyboardLayout.collectAsState()
@@ -852,21 +857,29 @@ fun TerminalScreen(
     if (showExitDialog) {
         AlertDialog(
             onDismissRequest = { showExitDialog = false },
-            title = { Text("确认退出", color = themeColors.foreground) },
+            title = { Text("退出终端", color = themeColors.foreground) },
             containerColor = themeColors.background,
-            text = { Text("确定要断开连接并退出终端吗？", color = themeColors.foreground) },
+            text = { Text("选择退出方式", color = themeColors.foreground) },
             confirmButton = {
                 TextButton(onClick = {
                     showExitDialog = false
-                    viewModel.disconnect()
                     onBack()
                 }) {
-                    Text("确定", color = Green500)
+                    Text("保持连接返回", color = Green500)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showExitDialog = false }) {
-                    Text("取消", color = themeColors.foreground)
+                Row {
+                    TextButton(onClick = { showExitDialog = false }) {
+                        Text("取消", color = themeColors.foreground)
+                    }
+                    TextButton(onClick = {
+                        showExitDialog = false
+                        viewModel.disconnect()
+                        onBack()
+                    }) {
+                        Text("断开并返回", color = Danger)
+                    }
                 }
             }
         )
